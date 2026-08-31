@@ -461,6 +461,33 @@ describe("theme files", () => {
     vi.unstubAllGlobals();
   });
 
+  it("uses the live system appearance when no explicit palette mode is supplied", () => {
+    const setProperty = vi.fn();
+    vi.stubGlobal("document", {
+      documentElement: {
+        classList: { contains: vi.fn(() => false) },
+        dataset: {},
+        style: { removeProperty: vi.fn(), setProperty },
+      },
+    });
+    vi.stubGlobal("window", {
+      matchMedia: vi.fn(() => ({ matches: true })),
+    });
+
+    applyThemePalette("system");
+
+    const surface = setProperty.mock.calls.findLast(
+      ([variable]) => variable === "--user-message-high-contrast-surface",
+    )?.[1];
+    const foreground = setProperty.mock.calls.findLast(
+      ([variable]) => variable === "--user-message-high-contrast-foreground",
+    )?.[1];
+    expect(asHex(surface)).toBe("#f5f5f5");
+    expect(asHex(foreground)).toBe("#0a0a0a");
+
+    vi.unstubAllGlobals();
+  });
+
   it("keeps optional light and dark palettes under one theme id", () => {
     const theme = parseThemeFile({
       version: THEME_FILE_VERSION,

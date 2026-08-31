@@ -1974,6 +1974,13 @@ export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeApp
   applyHighContrastUserMessageColors(root, colors, appearance);
 }
 
+function currentSystemAppearance(root: HTMLElement): ThemeAppearance {
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return root.classList?.contains?.("dark") ? "dark" : "light";
+}
+
 export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppearance): void {
   if (typeof document === "undefined") return;
 
@@ -1998,7 +2005,10 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
   for (const variable of Object.values(APP_THEME_VARIABLES)) {
     root.style.removeProperty(variable);
   }
-  const mode = appearance ?? legacyThemeMode(theme) ?? "light";
+  const mode =
+    appearance ??
+    legacyThemeMode(theme) ??
+    (theme === "system" ? currentSystemAppearance(root) : "light");
   applyHighContrastUserMessageColors(root, getStandardThemeColors(mode), mode);
 }
 
