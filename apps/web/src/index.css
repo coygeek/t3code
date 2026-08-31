@@ -1180,6 +1180,14 @@ html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] 
 html[data-user-message-presentation="high-contrast"]
   [data-user-message-bubble]
   .chat-markdown-codeblock {
+  --contrast-foreground: var(--code-foreground);
+  --contrast-muted-foreground: color-mix(
+    in oklab,
+    var(--code-foreground) 78%,
+    var(--code-background)
+  );
+  --accent: color-mix(in oklab, var(--code-background) 82%, var(--code-foreground));
+  --ring: var(--code-foreground);
   border-color: var(--contrast-border);
   background-color: var(--code-background);
   color: var(--code-foreground);
