@@ -1179,6 +1179,16 @@ html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] 
 
 html[data-user-message-presentation="high-contrast"]
   [data-user-message-bubble]
+  .chat-markdown
+  a:not(.chat-markdown-file-link) {
+  color: var(--message-foreground);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, currentcolor 65%, transparent);
+  text-underline-offset: 0.16em;
+}
+
+html[data-user-message-presentation="high-contrast"]
+  [data-user-message-bubble]
   .chat-markdown-codeblock {
   --contrast-foreground: var(--code-foreground);
   --contrast-muted-foreground: color-mix(
