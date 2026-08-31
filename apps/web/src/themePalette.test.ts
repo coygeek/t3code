@@ -81,10 +81,26 @@ function contrastRatio(first: string, second: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+function compositeForTest(foreground: string, backdrop: string): string {
+  const foregroundHex = themeColorToHex(foreground);
+  const backdropHex = asHex(backdrop);
+  if (!foregroundHex) throw new Error(`Expected a theme color, received ${foreground}`);
+  const alpha =
+    foregroundHex.length === 9 ? Number.parseInt(foregroundHex.slice(7, 9), 16) / 255 : 1;
+  const channel = (hex: string, index: number) => Number.parseInt(hex.slice(index, index + 2), 16);
+  return `#${[1, 3, 5]
+    .map((index) =>
+      Math.round(channel(backdropHex, index) * (1 - alpha) + channel(foregroundHex, index) * alpha)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 describe("high-contrast user message colors", () => {
   it("inverts the stock light and dark palettes through their own colors", () => {
-    const light = resolveHighContrastUserMessageColors(getStandardThemeColors("light"));
-    const dark = resolveHighContrastUserMessageColors(getStandardThemeColors("dark"));
+    const light = resolveHighContrastUserMessageColors(getStandardThemeColors("light"), "light");
+    const dark = resolveHighContrastUserMessageColors(getStandardThemeColors("dark"), "dark");
 
     expect(asHex(light.messageSurface)).toBe("#27272a");
     expect(asHex(light.messageForeground)).toBe("#fcfcfc");
@@ -93,10 +109,10 @@ describe("high-contrast user message colors", () => {
   });
 
   it.each([
-    ["stock light", getStandardThemeColors("light")],
-    ["stock dark", getStandardThemeColors("dark")],
-    ["custom light", createManagedThemeColors("light", "#f7f1e8", "#7c3aed")],
-    ["custom dark", createManagedThemeColors("dark", "#102a2a", "#2dd4bf")],
+    ["stock light", getStandardThemeColors("light"), "light"],
+    ["stock dark", getStandardThemeColors("dark"), "dark"],
+    ["custom light", createManagedThemeColors("light", "#f7f1e8", "#7c3aed"), "light"],
+    ["custom dark", createManagedThemeColors("dark", "#102a2a", "#2dd4bf"), "dark"],
     [
       "low-contrast custom",
       {
@@ -104,9 +120,10 @@ describe("high-contrast user message colors", () => {
         canvas: canonical("#777777"),
         text: canonical("#888888"),
       },
+      "light",
     ],
-  ] as const)("meets both contrast floors for %s", (_name, colors) => {
-    const resolved = resolveHighContrastUserMessageColors(colors);
+  ] as const)("meets both contrast floors for %s", (_name, colors, appearance) => {
+    const resolved = resolveHighContrastUserMessageColors(colors, appearance);
 
     expect(contrastRatio(resolved.messageSurface, colors.canvas)).toBeGreaterThanOrEqual(3);
     expect(
@@ -116,8 +133,15 @@ describe("high-contrast user message colors", () => {
 
   it("meets both contrast floors for every built-in appearance", () => {
     for (const theme of BUILT_IN_THEMES) {
-      for (const colors of [theme.colors, ...Object.values(theme.variants ?? {})]) {
-        const resolved = resolveHighContrastUserMessageColors(colors);
+      const appearances = [
+        { appearance: theme.appearance, colors: theme.colors },
+        ...Object.entries(theme.variants ?? {}).map(([appearance, colors]) => ({
+          appearance: appearance as "light" | "dark",
+          colors,
+        })),
+      ];
+      for (const { appearance, colors } of appearances) {
+        const resolved = resolveHighContrastUserMessageColors(colors, appearance);
 
         expect(contrastRatio(resolved.messageSurface, colors.canvas)).toBeGreaterThanOrEqual(3);
         expect(
@@ -125,6 +149,22 @@ describe("high-contrast user message colors", () => {
         ).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+
+  it("solves alpha-bearing custom colors against the appearance backdrop", () => {
+    const standard = getStandardThemeColors("light");
+    const colors = {
+      ...standard,
+      canvas: canonical("#11111133"),
+      text: canonical("#00000080"),
+    };
+    const effectiveCanvas = compositeForTest(colors.canvas, standard.canvas);
+    const resolved = resolveHighContrastUserMessageColors(colors, "light");
+
+    expect(contrastRatio(resolved.messageSurface, effectiveCanvas)).toBeGreaterThanOrEqual(3);
+    expect(
+      contrastRatio(resolved.messageForeground, resolved.messageSurface),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -390,18 +430,28 @@ describe("theme files", () => {
 
   it("suppresses sidebar artwork during a live custom-theme preview", () => {
     const listener = vi.fn();
+    const setProperty = vi.fn();
     const unsubscribe = subscribeToThemePreview(listener);
     vi.stubGlobal("document", {
       documentElement: {
         classList: { toggle: vi.fn() },
         dataset: {},
-        style: { removeProperty: vi.fn(), setProperty: vi.fn() },
+        style: { removeProperty: vi.fn(), setProperty },
       },
     });
 
     applyThemeColorPreview(T3_CHAT_THEME.colors, "light");
     expect(getThemePreviewSidebarArtwork()).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
+    const lightMessageSurface = setProperty.mock.calls.findLast(
+      ([variable]) => variable === "--user-message-high-contrast-surface",
+    )?.[1];
+
+    applyThemeColorPreview(T3_CHAT_THEME.variants!.dark!, "dark");
+    const darkMessageSurface = setProperty.mock.calls.findLast(
+      ([variable]) => variable === "--user-message-high-contrast-surface",
+    )?.[1];
+    expect(darkMessageSurface).not.toBe(lightMessageSurface);
 
     applyThemePalette("system");
     expect(getThemePreviewSidebarArtwork()).toBeNull();

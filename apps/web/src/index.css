@@ -1139,12 +1139,9 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
-html[data-user-message-presentation="high-contrast"]:not([data-user-message-presentation=""]) {
+html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] {
   --message-surface: var(--user-message-high-contrast-surface);
   --message-foreground: var(--user-message-high-contrast-foreground);
-}
-
-html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] {
   --background: color-mix(in oklab, var(--message-surface) 94%, var(--message-foreground));
   --foreground: var(--message-foreground);
   --card: var(--background);
@@ -1175,6 +1172,7 @@ html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] 
   --contrast-popover-foreground: var(--popover-foreground);
   --contrast-accent-foreground: var(--accent-foreground);
   --contrast-secondary-foreground: var(--secondary-foreground);
+  --contrast-message-foreground: var(--message-foreground);
   --contrast-border: var(--border);
   --contrast-input: var(--input);
 }

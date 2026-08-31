@@ -42,8 +42,7 @@ import {
   selectProjectGroupingSettings,
 } from "../logicalProject";
 import { useUiStateStore } from "../uiStateStore";
-import { syncBrowserChromeTheme, useTheme } from "../hooks/useTheme";
-import { getResolvedThemeColors, resolveThemeHalf } from "../themePalette";
+import { syncBrowserChromeTheme } from "../hooks/useTheme";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
@@ -181,16 +180,10 @@ function ContrastAppearanceSync() {
 
 function UserMessagePresentationSync() {
   const presentation = useClientSettings((settings) => settings.userMessagePresentation);
-  const { resolvedTheme, theme, themeHalves } = useTheme();
-  const activeTheme = resolveThemeHalf(theme, themeHalves, resolvedTheme);
 
   useEffect(() => {
-    applyUserMessagePresentation(
-      document.documentElement,
-      presentation,
-      getResolvedThemeColors(activeTheme, resolvedTheme),
-    );
-  }, [activeTheme, presentation, resolvedTheme]);
+    applyUserMessagePresentation(document.documentElement, presentation);
+  }, [presentation]);
 
   return null;
 }

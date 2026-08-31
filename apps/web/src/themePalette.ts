@@ -556,6 +556,17 @@ function parseThemeRgbColor(value: string, fallback: ThemeRgbColor): ThemeRgbCol
   return parsed ? themeOklchToRgb(parsed.color) : fallback;
 }
 
+function compositeThemeColor(
+  value: string,
+  backdrop: ThemeRgbColor,
+  fallback: ThemeRgbColor,
+): ThemeRgbColor {
+  const parsed = parseThemeColor(value);
+  return parsed
+    ? mixThemeRgbColors(backdrop, themeOklchToRgb(parsed.color), parsed.alpha)
+    : fallback;
+}
+
 function themeRgbToHexColor(color: ThemeRgbColor): string {
   return `#${[color.r, color.g, color.b]
     .map((channel) =>
@@ -1011,9 +1022,16 @@ export type UserMessageColors = Readonly<{
  * the canvas seeds its foreground, so custom hue choices survive whenever
  * they already satisfy the contrast floors.
  */
-export function resolveHighContrastUserMessageColors(colors: ThemeColors): UserMessageColors {
-  const canvas = parseThemeRgbColor(colors.canvas, { r: 252, g: 252, b: 252 });
-  const surfaceSeed = parseThemeRgbColor(colors.text, readableThemeForeground(canvas));
+export function resolveHighContrastUserMessageColors(
+  colors: ThemeColors,
+  appearance: ThemeAppearance,
+): UserMessageColors {
+  const standardCanvas = parseThemeRgbColor(
+    getStandardThemeColors(appearance).canvas,
+    appearance === "dark" ? { r: 10, g: 10, b: 10 } : { r: 252, g: 252, b: 252 },
+  );
+  const canvas = compositeThemeColor(colors.canvas, standardCanvas, standardCanvas);
+  const surfaceSeed = compositeThemeColor(colors.text, canvas, readableThemeForeground(canvas));
   const surfaceDirection =
     themeContrastRatio(canvas, THEME_WHITE_FOREGROUND) >=
     themeContrastRatio(canvas, THEME_BLACK_FOREGROUND)
@@ -1046,6 +1064,22 @@ export function resolveHighContrastUserMessageColors(colors: ThemeColors): UserM
     messageSurface: themeOklchToThemeColor(messageSurface),
     messageForeground: themeOklchToThemeColor(messageForeground),
   };
+}
+
+const HIGH_CONTRAST_USER_MESSAGE_SURFACE_VARIABLE = "--user-message-high-contrast-surface";
+const HIGH_CONTRAST_USER_MESSAGE_FOREGROUND_VARIABLE = "--user-message-high-contrast-foreground";
+
+function applyHighContrastUserMessageColors(
+  root: HTMLElement,
+  colors: ThemeColors,
+  appearance: ThemeAppearance,
+): void {
+  const resolved = resolveHighContrastUserMessageColors(colors, appearance);
+  root.style.setProperty(HIGH_CONTRAST_USER_MESSAGE_SURFACE_VARIABLE, resolved.messageSurface);
+  root.style.setProperty(
+    HIGH_CONTRAST_USER_MESSAGE_FOREGROUND_VARIABLE,
+    resolved.messageForeground,
+  );
 }
 
 function readableThemeText(
@@ -1533,16 +1567,6 @@ export function getThemeColorsForMode(
 }
 
 /** Resolve the complete palette that the selected theme paints for one appearance. */
-export function getResolvedThemeColors(
-  theme: ThemePreference,
-  appearance: ThemeAppearance,
-): ThemeColors {
-  const definition = getThemeDefinition(theme);
-  return definition
-    ? (getThemeColorsForMode(definition, appearance) ?? definition.colors)
-    : getStandardThemeColors(appearance);
-}
-
 export function getThemeModes(theme: ThemeDefinition): ReadonlyArray<ThemeAppearance> {
   return (["light", "dark"] as const).filter((mode) => getThemeColorsForMode(theme, mode) !== null);
 }
@@ -1947,6 +1971,7 @@ export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeApp
     // A half-typed hex keeps the last good value instead of blanking the role.
     if (isThemeColor(value)) root.style.setProperty(APP_THEME_VARIABLES[role], value);
   }
+  applyHighContrastUserMessageColors(root, colors, appearance);
 }
 
 export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppearance): void {
@@ -1965,6 +1990,7 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
     for (const [role, value] of Object.entries(colors) as Array<[ThemeColorRole, string]>) {
       root.style.setProperty(APP_THEME_VARIABLES[role], value);
     }
+    applyHighContrastUserMessageColors(root, colors, mode);
     return;
   }
 
@@ -1972,6 +1998,8 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
   for (const variable of Object.values(APP_THEME_VARIABLES)) {
     root.style.removeProperty(variable);
   }
+  const mode = appearance ?? legacyThemeMode(theme) ?? "light";
+  applyHighContrastUserMessageColors(root, getStandardThemeColors(mode), mode);
 }
 
 export function resolveThemeAppearance(
