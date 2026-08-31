@@ -20,6 +20,7 @@ import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
   type EnvironmentIdentificationMode,
+  type UserMessagePresentation,
   MAX_APPEARANCE_CONTRAST,
   MAX_CODE_FONT_SIZE,
   MAX_GLASS_OPACITY,
@@ -126,6 +127,7 @@ import {
   durationToSeconds,
   formatDiagnosticsDescription,
   getChangedBrowserSettingLabels,
+  getAppearanceSettingsRestorePatch,
   getChangedTypographySettingLabels,
   normalizeIntervalSeconds,
   PROVIDER_HEALTH_INTERVAL_STEP_SECONDS,
@@ -151,6 +153,11 @@ const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, s
   artwork: "Artwork",
   pill: "Version pill",
   none: "None",
+};
+
+const USER_MESSAGE_PRESENTATION_LABELS: Record<UserMessagePresentation, string> = {
+  subtle: "Subtle",
+  "high-contrast": "High contrast",
 };
 
 const TIMESTAMP_FORMAT_LABELS = {
@@ -480,6 +487,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
         ? ["Contrast"]
         : []),
+      ...(settings.userMessagePresentation !== DEFAULT_UNIFIED_SETTINGS.userMessagePresentation
+        ? ["User messages"]
+        : []),
       ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["Glass opacity"] : []),
       ...(settings.environmentIdentificationMode !==
       DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
@@ -556,6 +566,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.browserRecordingFrameRate,
       settings.browserAutoShowFloatingPreview,
       settings.appearanceContrast,
+      settings.userMessagePresentation,
       settings.enableAgentBrowserAccess,
       settings.confirmQuit,
       settings.confirmThreadArchive,
@@ -653,13 +664,12 @@ export function useSettingsRestore(onRestored?: () => void) {
       return;
     }
     updateSettings({
-      appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
+      ...getAppearanceSettingsRestorePatch(),
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
-      glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       sidebarThreadPreviewCount: DEFAULT_UNIFIED_SETTINGS.sidebarThreadPreviewCount,
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
@@ -1077,6 +1087,47 @@ export function AppearanceSettingsPanel() {
                 value={settings.appearanceContrast}
               />
             </div>
+          }
+        />
+
+        <SettingsRow
+          {...searchableSetting("user-message-presentation")}
+          description="Choose the visual separation of user-authored messages."
+          resetAction={
+            settings.userMessagePresentation !==
+            DEFAULT_UNIFIED_SETTINGS.userMessagePresentation ? (
+              <SettingResetButton
+                label="user messages"
+                onClick={() =>
+                  updateSettings({
+                    userMessagePresentation: DEFAULT_UNIFIED_SETTINGS.userMessagePresentation,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.userMessagePresentation}
+              onValueChange={(value) => {
+                if (value === "subtle" || value === "high-contrast") {
+                  updateSettings({ userMessagePresentation: value });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40" aria-label="User messages">
+                <SelectValue>
+                  {USER_MESSAGE_PRESENTATION_LABELS[settings.userMessagePresentation]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {Object.entries(USER_MESSAGE_PRESENTATION_LABELS).map(([value, label]) => (
+                  <SelectItem hideIndicator key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
           }
         />
 

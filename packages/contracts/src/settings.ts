@@ -83,6 +83,10 @@ export const AppearanceContrast = Schema.Int.check(
 );
 export type AppearanceContrast = typeof AppearanceContrast.Type;
 export const DEFAULT_APPEARANCE_CONTRAST: AppearanceContrast = 100;
+
+export const UserMessagePresentation = Schema.Literals(["subtle", "high-contrast"]);
+export type UserMessagePresentation = typeof UserMessagePresentation.Type;
+export const DEFAULT_USER_MESSAGE_PRESENTATION: UserMessagePresentation = "subtle";
 /**
  * Font size preferences, in CSS pixels. The ranges are deliberately narrow:
  * the interface size scales every rem-based dimension in the app, so the
@@ -161,6 +165,9 @@ export const DEFAULT_BROWSER_RECORDING_FRAME_RATE: BrowserRecordingFrameRate = 3
 export const ClientSettingsSchema = Schema.Struct({
   appearanceContrast: AppearanceContrast.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_APPEARANCE_CONTRAST)),
+  ),
+  userMessagePresentation: UserMessagePresentation.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_USER_MESSAGE_PRESENTATION)),
   ),
   browserDefaultViewport: PreviewViewportSetting.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BROWSER_VIEWPORT)),
@@ -931,6 +938,7 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 
 export const ClientSettingsPatch = Schema.Struct({
   appearanceContrast: Schema.optionalKey(AppearanceContrast),
+  userMessagePresentation: Schema.optionalKey(UserMessagePresentation),
   browserDefaultViewport: Schema.optionalKey(PreviewViewportSetting),
   browserDefaultZoomFactor: Schema.optionalKey(PreviewZoomFactor),
   browserDefaultAppearance: Schema.optionalKey(PreviewAppearancePreference),

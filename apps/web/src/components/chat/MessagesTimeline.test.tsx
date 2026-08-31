@@ -828,7 +828,26 @@ describe("MessagesTimeline", () => {
 
     expect(markup).not.toContain("Show full message");
     expect(markup).toContain('data-user-message-collapsible="false"');
+    expect(markup).toContain('data-user-message-bubble="true"');
     expect(markup).toContain("rounded-2xl bg-message p-3");
+  });
+
+  it("keeps user message actions and focus indicators on semantic colors", () => {
+    const entry = buildUserTimelineEntry("Review [the change](https://example.com) and `ship` it.");
+    const markup = renderToStaticMarkup(
+      <MessagesTimeline
+        {...buildProps()}
+        revertTurnCountByUserMessageId={new Map([[entry.message.id, 1]])}
+        timelineEntries={[entry]}
+      />,
+    );
+
+    expect(markup).toContain('data-user-message-bubble="true"');
+    expect(markup).toContain('aria-label="Revert to this message"');
+    expect(markup).toContain('aria-label="Copy link"');
+    expect(markup).toContain("focus-visible:ring-2");
+    expect(markup).toContain('href="https://example.com"');
+    expect(markup).toContain('<code data-inline-code="">ship</code>');
   });
 
   it("preserves arbitrary XML-like tags and comparisons in rendered user messages", async () => {

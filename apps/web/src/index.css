@@ -1139,6 +1139,61 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
+html[data-user-message-presentation="high-contrast"]:not([data-user-message-presentation=""]) {
+  --message-surface: var(--user-message-high-contrast-surface);
+  --message-foreground: var(--user-message-high-contrast-foreground);
+}
+
+html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] {
+  --background: color-mix(in oklab, var(--message-surface) 94%, var(--message-foreground));
+  --foreground: var(--message-foreground);
+  --card: var(--background);
+  --card-foreground: var(--message-foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--message-foreground);
+  --primary: var(--message-foreground);
+  --primary-foreground: var(--message-surface);
+  --secondary: color-mix(in oklab, var(--message-surface) 88%, var(--message-foreground));
+  --secondary-foreground: var(--message-foreground);
+  --muted: color-mix(in oklab, var(--message-surface) 88%, var(--message-foreground));
+  --muted-foreground: color-mix(in oklab, var(--message-foreground) 78%, var(--message-surface));
+  --placeholder: var(--muted-foreground);
+  --secondary-label: var(--muted-foreground);
+  --icon-muted: var(--muted-foreground);
+  --accent: color-mix(in oklab, var(--message-surface) 82%, var(--message-foreground));
+  --accent-foreground: var(--message-foreground);
+  --border: color-mix(in oklab, var(--message-surface) 72%, var(--message-foreground));
+  --input: var(--border);
+  --ring: var(--message-foreground);
+  --info-foreground: var(--message-foreground);
+  --contrast-foreground: var(--message-foreground);
+  --contrast-muted-foreground: var(--muted-foreground);
+  --contrast-placeholder: var(--placeholder);
+  --contrast-secondary-label: var(--secondary-label);
+  --contrast-icon-muted: var(--icon-muted);
+  --contrast-card-foreground: var(--card-foreground);
+  --contrast-popover-foreground: var(--popover-foreground);
+  --contrast-accent-foreground: var(--accent-foreground);
+  --contrast-secondary-foreground: var(--secondary-foreground);
+  --contrast-border: var(--border);
+  --contrast-input: var(--input);
+}
+
+html[data-user-message-presentation="high-contrast"]
+  [data-user-message-bubble]
+  .chat-markdown-codeblock {
+  border-color: var(--contrast-border);
+  background-color: var(--code-background);
+  color: var(--code-foreground);
+}
+
+html[data-user-message-presentation="high-contrast"]
+  [data-user-message-bubble]
+  .chat-markdown-codeblock
+  pre {
+  color: var(--code-foreground);
+}
+
 /* Theme-token dependency probes are restored synchronously, before paint. Keep
    transitions from observing the temporary sentinel color in between. */
 html[data-theme-token-probe],

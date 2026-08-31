@@ -7,6 +7,7 @@ import type {
   ProviderInstanceId,
   ServerSettings,
   SidebarProjectGroupingMode,
+  ClientSettingsPatch,
   UnifiedSettings,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
@@ -29,6 +30,17 @@ export function projectGroupingModeFromToggle(
 ): SidebarProjectGroupingMode {
   if (!enabled) return "separate";
   return lastEnabledMode === "repository_path" ? "repository_path" : "repository";
+}
+
+export function getAppearanceSettingsRestorePatch(): Pick<
+  ClientSettingsPatch,
+  "appearanceContrast" | "userMessagePresentation" | "glassOpacity"
+> {
+  return {
+    appearanceContrast: DEFAULT_UNIFIED_SETTINGS.appearanceContrast,
+    userMessagePresentation: DEFAULT_UNIFIED_SETTINGS.userMessagePresentation,
+    glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
+  };
 }
 
 const LAST_ENABLED_PROJECT_GROUPING_MODE_KEY = "t3code:last-enabled-project-grouping-mode";

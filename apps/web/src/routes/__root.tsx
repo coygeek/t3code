@@ -33,6 +33,7 @@ import {
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
+import { applyUserMessagePresentation } from "~/userMessagePresentation";
 import { useClientSettings } from "../hooks/useSettings";
 import { PlanAgentSelectionHeal } from "../planAgentSelectionHeal";
 import {
@@ -41,7 +42,8 @@ import {
   selectProjectGroupingSettings,
 } from "../logicalProject";
 import { useUiStateStore } from "../uiStateStore";
-import { syncBrowserChromeTheme } from "../hooks/useTheme";
+import { syncBrowserChromeTheme, useTheme } from "../hooks/useTheme";
+import { getResolvedThemeColors, resolveThemeHalf } from "../themePalette";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
@@ -134,6 +136,7 @@ function RootRouteView() {
     <ToastProvider>
       <AnchoredToastProvider>
         <DocumentTitleSync />
+        <UserMessagePresentationSync />
         <ContrastAppearanceSync />
         <EnvironmentThemeSync />
         <GlassAppearanceSync />
@@ -172,6 +175,22 @@ function ContrastAppearanceSync() {
   useEffect(() => {
     applyAppearanceContrast(document.documentElement, appearanceContrast);
   }, [appearanceContrast]);
+
+  return null;
+}
+
+function UserMessagePresentationSync() {
+  const presentation = useClientSettings((settings) => settings.userMessagePresentation);
+  const { resolvedTheme, theme, themeHalves } = useTheme();
+  const activeTheme = resolveThemeHalf(theme, themeHalves, resolvedTheme);
+
+  useEffect(() => {
+    applyUserMessagePresentation(
+      document.documentElement,
+      presentation,
+      getResolvedThemeColors(activeTheme, resolvedTheme),
+    );
+  }, [activeTheme, presentation, resolvedTheme]);
 
   return null;
 }

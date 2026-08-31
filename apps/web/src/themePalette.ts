@@ -1000,6 +1000,54 @@ function readableThemeForeground(background: ThemeRgbColor): ThemeRgbColor {
     : THEME_BLACK_FOREGROUND;
 }
 
+export type UserMessageColors = Readonly<{
+  messageSurface: string;
+  messageForeground: string;
+}>;
+
+/**
+ * Invert user messages through the active palette while keeping enough
+ * headroom for browser color conversion. Theme text seeds the bubble, and
+ * the canvas seeds its foreground, so custom hue choices survive whenever
+ * they already satisfy the contrast floors.
+ */
+export function resolveHighContrastUserMessageColors(colors: ThemeColors): UserMessageColors {
+  const canvas = parseThemeRgbColor(colors.canvas, { r: 252, g: 252, b: 252 });
+  const surfaceSeed = parseThemeRgbColor(colors.text, readableThemeForeground(canvas));
+  const surfaceDirection =
+    themeContrastRatio(canvas, THEME_WHITE_FOREGROUND) >=
+    themeContrastRatio(canvas, THEME_BLACK_FOREGROUND)
+      ? "lighter"
+      : "darker";
+  const messageSurface = solveOklchLightness(
+    themeRgbToOklch(surfaceSeed),
+    canvas,
+    3.1,
+    surfaceDirection,
+  );
+  const messageSurfaceRgb = themeOklchToRgb(messageSurface);
+  const foregroundSeed = parseThemeRgbColor(
+    colors.canvas,
+    readableThemeForeground(messageSurfaceRgb),
+  );
+  const foregroundDirection =
+    themeContrastRatio(messageSurfaceRgb, THEME_WHITE_FOREGROUND) >=
+    themeContrastRatio(messageSurfaceRgb, THEME_BLACK_FOREGROUND)
+      ? "lighter"
+      : "darker";
+  const messageForeground = solveOklchLightness(
+    themeRgbToOklch(foregroundSeed),
+    messageSurfaceRgb,
+    4.6,
+    foregroundDirection,
+  );
+
+  return {
+    messageSurface: themeOklchToThemeColor(messageSurface),
+    messageForeground: themeOklchToThemeColor(messageForeground),
+  };
+}
+
 function readableThemeText(
   background: ThemeRgbColor,
   foreground: ThemeRgbColor,
@@ -1482,6 +1530,17 @@ export function getThemeColorsForMode(
 ): ThemeColors | null {
   if (mode === theme.appearance) return theme.colors;
   return theme.variants?.[mode] ?? null;
+}
+
+/** Resolve the complete palette that the selected theme paints for one appearance. */
+export function getResolvedThemeColors(
+  theme: ThemePreference,
+  appearance: ThemeAppearance,
+): ThemeColors {
+  const definition = getThemeDefinition(theme);
+  return definition
+    ? (getThemeColorsForMode(definition, appearance) ?? definition.colors)
+    : getStandardThemeColors(appearance);
 }
 
 export function getThemeModes(theme: ThemeDefinition): ReadonlyArray<ThemeAppearance> {

@@ -118,6 +118,29 @@ describe("ClientSettings appearance contrast", () => {
   });
 });
 
+describe("ClientSettings user message presentation", () => {
+  it("defaults older settings to the subtle treatment", () => {
+    expect(decodeClientSettings({}).userMessagePresentation).toBe("subtle");
+  });
+
+  it.each(["subtle", "high-contrast"] as const)(
+    "accepts the %s treatment in settings and patches",
+    (userMessagePresentation) => {
+      expect(decodeClientSettings({ userMessagePresentation }).userMessagePresentation).toBe(
+        userMessagePresentation,
+      );
+      expect(decodeClientSettingsPatch({ userMessagePresentation }).userMessagePresentation).toBe(
+        userMessagePresentation,
+      );
+    },
+  );
+
+  it("rejects unsupported treatments", () => {
+    expect(() => decodeClientSettings({ userMessagePresentation: "inverted" })).toThrow();
+    expect(() => decodeClientSettingsPatch({ userMessagePresentation: "inverted" })).toThrow();
+  });
+});
+
 describe("ClientSettings environment identification", () => {
   it("defaults to artwork and accepts each presentation mode", () => {
     expect(decodeClientSettings({}).environmentIdentificationMode).toBe("artwork");

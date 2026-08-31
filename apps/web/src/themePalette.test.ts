@@ -36,6 +36,8 @@ import {
   createManagedThemeColors,
   createVividThemeColors,
   getDefaultThemeColors,
+  getStandardThemeColors,
+  resolveHighContrastUserMessageColors,
   themeColorToHex,
   toCanonicalThemeColor,
   THEME_FILE_VERSION,
@@ -78,6 +80,53 @@ function contrastRatio(first: string, second: string): number {
   const darker = Math.min(luminance(first), luminance(second));
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+describe("high-contrast user message colors", () => {
+  it("inverts the stock light and dark palettes through their own colors", () => {
+    const light = resolveHighContrastUserMessageColors(getStandardThemeColors("light"));
+    const dark = resolveHighContrastUserMessageColors(getStandardThemeColors("dark"));
+
+    expect(asHex(light.messageSurface)).toBe("#27272a");
+    expect(asHex(light.messageForeground)).toBe("#fcfcfc");
+    expect(asHex(dark.messageSurface)).toBe("#f5f5f5");
+    expect(asHex(dark.messageForeground)).toBe("#0a0a0a");
+  });
+
+  it.each([
+    ["stock light", getStandardThemeColors("light")],
+    ["stock dark", getStandardThemeColors("dark")],
+    ["custom light", createManagedThemeColors("light", "#f7f1e8", "#7c3aed")],
+    ["custom dark", createManagedThemeColors("dark", "#102a2a", "#2dd4bf")],
+    [
+      "low-contrast custom",
+      {
+        ...getStandardThemeColors("light"),
+        canvas: canonical("#777777"),
+        text: canonical("#888888"),
+      },
+    ],
+  ] as const)("meets both contrast floors for %s", (_name, colors) => {
+    const resolved = resolveHighContrastUserMessageColors(colors);
+
+    expect(contrastRatio(resolved.messageSurface, colors.canvas)).toBeGreaterThanOrEqual(3);
+    expect(
+      contrastRatio(resolved.messageForeground, resolved.messageSurface),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("meets both contrast floors for every built-in appearance", () => {
+    for (const theme of BUILT_IN_THEMES) {
+      for (const colors of [theme.colors, ...Object.values(theme.variants ?? {})]) {
+        const resolved = resolveHighContrastUserMessageColors(colors);
+
+        expect(contrastRatio(resolved.messageSurface, colors.canvas)).toBeGreaterThanOrEqual(3);
+        expect(
+          contrastRatio(resolved.messageForeground, resolved.messageSurface),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});
 
 describe("theme files", () => {
   it("keeps every built-in palette value in canonical OKLCH form", () => {

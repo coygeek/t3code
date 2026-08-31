@@ -12,6 +12,7 @@ import {
   backgroundActivitySharedPolicySettings,
   buildProviderInstanceUpdatePatch,
   formatDiagnosticsDescription,
+  getAppearanceSettingsRestorePatch,
   getChangedBrowserSettingLabels,
   getChangedTypographySettingLabels,
   isSamePreviewViewport,
@@ -20,6 +21,16 @@ import {
   projectGroupingModeFromToggle,
   resolveBackgroundActivityProfileOption,
 } from "./SettingsPanels.logic";
+
+describe("appearance settings restore", () => {
+  it("restores subtle user messages with the neighboring appearance defaults", () => {
+    expect(getAppearanceSettingsRestorePatch()).toEqual({
+      appearanceContrast: 100,
+      userMessagePresentation: "subtle",
+      glassOpacity: 80,
+    });
+  });
+});
 
 describe("typography settings restore", () => {
   it("detects family and size changes by font row", () => {

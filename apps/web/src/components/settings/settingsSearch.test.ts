@@ -92,6 +92,10 @@ describe("searchSettings", () => {
       id: "word-wrap",
       to: "/settings/appearance",
     });
+    expect(searchSettings("user messages")[0]).toMatchObject({
+      id: "user-message-presentation",
+      to: "/settings/appearance",
+    });
     expect(searchSettings("environment identification")[0]).toMatchObject({
       id: "environment-identification",
       to: "/settings/appearance",
