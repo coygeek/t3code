@@ -1180,7 +1180,7 @@ html[data-user-message-presentation="high-contrast"] [data-user-message-bubble] 
 html[data-user-message-presentation="high-contrast"]
   [data-user-message-bubble]
   .chat-markdown
-  a:not(.chat-markdown-file-link) {
+  a:not(.chat-markdown-file-link, [data-footnote-ref], [data-footnote-backref]) {
   color: var(--message-foreground);
   text-decoration-line: underline;
   text-decoration-color: color-mix(in srgb, currentcolor 65%, transparent);
