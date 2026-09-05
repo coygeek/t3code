@@ -19,7 +19,10 @@ import {
   useProjects,
   useThreadShells,
 } from "../state/entities";
-import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
+import { useEnvironments, useEnvironment, usePrimaryEnvironmentId } from "../state/environments";
+import type { EnvironmentId } from "@t3tools/contracts";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { primaryEnvironmentIdAtom } from "../state/primaryEnvironment";
 import { APP_DISPLAY_NAME } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 
@@ -47,19 +50,30 @@ function ChatIndexRouteView() {
 }
 
 function ConfiguredIndexLanding() {
+  const environmentId = usePrimaryEnvironmentId();
   const config = useAtomValue(primaryServerConfigAtom);
   // Schema defaults are not the saved preference. Wait for the owning server
   // before allowing the recent-project landing to navigate to another machine.
   if (!isHostedStaticApp() && config === null) return null;
-  return config?.settings.openDefaultFolderOnStartup ? (
-    <StartupFolderLanding directory={config.settings.addProjectBaseDirectory} />
+  return config?.settings.openDefaultFolderOnStartup && environmentId !== null ? (
+    <StartupFolderLanding
+      key={JSON.stringify([environmentId, config.settings.addProjectBaseDirectory])}
+      environmentId={environmentId}
+      directory={config.settings.addProjectBaseDirectory}
+    />
   ) : (
     <IndexDraftLanding />
   );
 }
 
-function StartupFolderLanding({ directory }: { directory: string }) {
-  const environment = usePrimaryEnvironment();
+function StartupFolderLanding({
+  directory,
+  environmentId,
+}: {
+  directory: string;
+  environmentId: EnvironmentId;
+}) {
+  const environment = useEnvironment(environmentId);
   const shell = useEnvironmentQuery(
     environment === null ? null : environmentShell.stateAtom(environment.environmentId),
   );
@@ -88,14 +102,21 @@ function StartupFolderLanding({ directory }: { directory: string }) {
 
   const start = useEffectEvent(async () => {
     if (!environment) return;
-    const environmentId = environment.environmentId;
     const requestingHref = router.state.location.href;
+    const isCurrent = () =>
+      mountedRef.current &&
+      appAtomRegistry.get(primaryEnvironmentIdAtom) === environmentId &&
+      router.state.location.href === requestingHref;
     try {
       const projectRef = await resolveStartupFolderProject({
         environmentId,
         directory,
+        isCurrent,
         browse: async (partialPath) => {
-          const result = await browse({ environmentId, input: { partialPath } });
+          const result = await browse({
+            environmentId,
+            input: { partialPath, requireReadableDirectory: true },
+          });
           if (result._tag === "Failure") throw squashAtomCommandFailure(result);
           return result.value;
         },
@@ -117,7 +138,7 @@ function StartupFolderLanding({ directory }: { directory: string }) {
         },
         waitForProject,
       });
-      if (!mountedRef.current || router.state.location.href !== requestingHref) return;
+      if (projectRef === null || !isCurrent()) return;
       await openThread(projectRef, {
         replace: true,
         envMode: "local",
@@ -126,7 +147,7 @@ function StartupFolderLanding({ directory }: { directory: string }) {
         startFromOrigin: false,
       });
     } catch {
-      if (mountedRef.current) setFailure(directory.trim() || "~/");
+      if (isCurrent()) setFailure(directory.trim() || "~/");
     }
   });
 

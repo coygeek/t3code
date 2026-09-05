@@ -30,6 +30,7 @@ function dependencies(projects: EnvironmentProject[] = []) {
   return {
     environmentId: primaryId,
     directory: folder,
+    isCurrent: () => true,
     browse: vi.fn(async (_partialPath: string) => ({ parentPath: folder })),
     readProjects: () => projects,
     createProject: vi.fn(async (_workspaceRoot: string) => ProjectId.make("created")),
@@ -128,5 +129,61 @@ describe("resolveStartupFolderProject", () => {
       environmentId: primaryId,
       projectId: "created",
     });
+  });
+});
+
+describe("startup target changes", () => {
+  it("does not register the old folder when the primary changes during browsing", async () => {
+    const deps = dependencies();
+    let primary = primaryId;
+    deps.isCurrent = () => primary === primaryId;
+    let finishBrowse = (_value: { parentPath: string }) => {};
+    deps.browse.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishBrowse = resolve;
+        }),
+    );
+    const oldAttempt = resolveStartupFolderProject(deps);
+    primary = remoteId;
+    finishBrowse({ parentPath: folder });
+    await expect(oldAttempt).resolves.toBeNull();
+    expect(deps.createProject).not.toHaveBeenCalled();
+    expect(deps.waitForProject).not.toHaveBeenCalled();
+
+    const next = { ...dependencies([project(remoteId, "next")]), environmentId: remoteId };
+    await expect(resolveStartupFolderProject(next)).resolves.toEqual({
+      environmentId: remoteId,
+      projectId: "next",
+    });
+  });
+
+  it("does not return an old navigation target when the primary changes during projection", async () => {
+    const deps = dependencies([project(primaryId, "local")]);
+    let current = true;
+    deps.isCurrent = () => current;
+    let reportWaiting = () => {};
+    const waiting = new Promise<void>((resolve) => {
+      reportWaiting = resolve;
+    });
+    let finishProjection = () => {};
+    deps.waitForProject.mockImplementation(() => {
+      reportWaiting();
+      return new Promise<void>((resolve) => {
+        finishProjection = resolve;
+      });
+    });
+    const oldAttempt = resolveStartupFolderProject(deps);
+    await waiting;
+    current = false;
+    finishProjection();
+    await expect(oldAttempt).resolves.toBeNull();
+  });
+
+  it("skips work for an already superseded attempt", async () => {
+    const deps = { ...dependencies(), isCurrent: () => false };
+    await expect(resolveStartupFolderProject(deps)).resolves.toBeNull();
+    expect(deps.browse).not.toHaveBeenCalled();
+    expect(deps.createProject).not.toHaveBeenCalled();
   });
 });

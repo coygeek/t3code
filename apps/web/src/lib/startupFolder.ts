@@ -10,20 +10,24 @@ import type { EnvironmentId, ProjectId, ScopedProjectRef } from "@t3tools/contra
 export async function resolveStartupFolderProject(input: {
   environmentId: EnvironmentId;
   directory: string;
+  isCurrent: () => boolean;
   browse: (partialPath: string) => Promise<{ parentPath: string }>;
   readProjects: () => ReadonlyArray<EnvironmentProject>;
   createProject: (workspaceRoot: string) => Promise<ProjectId>;
   waitForProject: (projectRef: ScopedProjectRef) => Promise<unknown>;
-}): Promise<ScopedProjectRef> {
+}): Promise<ScopedProjectRef | null> {
+  if (!input.isCurrent()) return null;
   const { parentPath } = await input.browse(
     ensureBrowseDirectoryPath(input.directory.trim() || "~/"),
   );
+  if (!input.isCurrent()) return null;
   const existing = findProjectByPath(
     input.readProjects().filter((project) => project.environmentId === input.environmentId),
     parentPath,
   );
   const projectId = existing?.id ?? (await input.createProject(parentPath));
+  if (!input.isCurrent()) return null;
   const projectRef = scopeProjectRef(input.environmentId, projectId);
   await input.waitForProject(projectRef);
-  return projectRef;
+  return input.isCurrent() ? projectRef : null;
 }
