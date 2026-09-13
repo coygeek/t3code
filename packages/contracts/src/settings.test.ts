@@ -58,11 +58,11 @@ describe("ServerSettings startup folder", () => {
   it.each([true, false])("round-trips and patches the enabled state %s", (enabled) => {
     const settings = decodeServerSettings({
       openDefaultFolderOnStartup: enabled,
-      addProjectBaseDirectory: "~/WIP",
+      addProjectBaseDirectory: "/tmp/example-project",
     });
     expect(decodeServerSettings(encodeServerSettings(settings))).toMatchObject({
       openDefaultFolderOnStartup: enabled,
-      addProjectBaseDirectory: "~/WIP",
+      addProjectBaseDirectory: "/tmp/example-project",
     });
     expect(decodeServerSettingsPatch({ openDefaultFolderOnStartup: enabled })).toEqual({
       openDefaultFolderOnStartup: enabled,
