@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   getProjectFaviconCacheKey,
   isProjectFaviconFallbackUrl,
+  getProjectPathIdentity,
   PROJECT_FAVICON_FALLBACK_MARKER,
 } from "./projectFavicon.ts";
 
@@ -48,5 +49,12 @@ describe("project favicon", () => {
       ),
     ).toBe(false);
     expect(isProjectFaviconFallbackUrl(null)).toBe(false);
+  });
+  it("derives a stable identity from a project path", () => {
+    expect(getProjectPathIdentity("/work/alpha")).toEqual(getProjectPathIdentity("/work/alpha"));
+    expect(getProjectPathIdentity("/work/alpha").initial).toBe("A");
+    expect(getProjectPathIdentity("/work/alpha").hue).not.toBe(
+      getProjectPathIdentity("/work/beta").hue,
+    );
   });
 });

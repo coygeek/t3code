@@ -1,6 +1,7 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   getProjectFaviconCacheKey,
+  getProjectPathIdentity,
   isProjectFaviconFallbackUrl,
 } from "@t3tools/shared/projectFavicon";
 import { FolderIcon } from "lucide-react";
@@ -23,7 +24,19 @@ export function ProjectFavicon(input: {
   const FallbackIcon = input.fallbackIcon ?? FolderIcon;
 
   if (!src || isProjectFaviconFallbackUrl(src)) {
-    return <ProjectFaviconFallback className={input.className} icon={FallbackIcon} />;
+    const identity = getProjectPathIdentity(input.cwd);
+    return (
+      <span
+        aria-label={`Project icon for ${identity.initial}`}
+        className={cn(
+          "inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm text-[9px] font-medium text-white",
+          input.className,
+        )}
+        style={{ backgroundColor: `hsl(${identity.hue} 65% 45%)` }}
+      >
+        {identity.initial}
+      </span>
+    );
   }
 
   const cacheKey = getProjectFaviconCacheKey(input.environmentId, input.cwd, src);
