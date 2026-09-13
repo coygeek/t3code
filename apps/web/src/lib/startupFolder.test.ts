@@ -6,7 +6,7 @@ import { resolveStartupFolderProject } from "./startupFolder";
 
 const primaryId = EnvironmentId.make("primary");
 const remoteId = EnvironmentId.make("remote");
-const folder = "/workspace/WIP";
+const folder = "/workspace/example-project";
 
 function project(
   environmentId: EnvironmentId,
@@ -16,7 +16,7 @@ function project(
   return {
     environmentId,
     id: ProjectId.make(id),
-    title: "WIP",
+    title: "Example project",
     workspaceRoot,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -50,15 +50,15 @@ describe("resolveStartupFolderProject", () => {
   });
 
   it("matches a home-relative preference against the absolute path resolved by its server", async () => {
-    const deps = dependencies([project(primaryId, "local", "/home/developer/WIP/")]);
-    deps.directory = "  ~/WIP  ";
-    deps.browse.mockResolvedValue({ parentPath: "/home/developer/WIP" });
+    const deps = dependencies([project(primaryId, "local", "/home/tester/example-project/")]);
+    deps.directory = "  ~/example-project  ";
+    deps.browse.mockResolvedValue({ parentPath: "/home/tester/example-project" });
 
     await expect(resolveStartupFolderProject(deps)).resolves.toEqual({
       environmentId: primaryId,
       projectId: "local",
     });
-    expect(deps.browse).toHaveBeenCalledWith("~/WIP/");
+    expect(deps.browse).toHaveBeenCalledWith("~/example-project/");
     expect(deps.createProject).not.toHaveBeenCalled();
   });
 
