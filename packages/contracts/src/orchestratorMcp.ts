@@ -37,6 +37,55 @@ import {
   ProviderOptionSelectionValue,
 } from "./model.ts";
 import { ProviderDriverKind, ProviderInstanceId } from "./providerInstance.ts";
+import {
+  Initiative,
+  InitiativeCreateInput,
+  InitiativeListResult,
+  InitiativeSetStatusInput,
+  InitiativeUpdateInput,
+} from "./initiative.ts";
+
+export const OrchestratorMcpInitiativeListInput = Schema.Struct({
+  projectId: Schema.optional(
+    ProjectId.annotate({
+      description: "Omit for this thread's project, or all projects for an external MCP client.",
+    }),
+  ),
+});
+export type OrchestratorMcpInitiativeListInput = typeof OrchestratorMcpInitiativeListInput.Type;
+export const OrchestratorMcpInitiativeListResult = InitiativeListResult;
+
+export const OrchestratorMcpInitiativeReadInput = Schema.Struct({
+  id: Schema.optional(
+    TrimmedNonEmptyString.annotate({
+      description: "Initiative ID. Omit to discover the initiative coordinated by this thread.",
+    }),
+  ),
+});
+export type OrchestratorMcpInitiativeReadInput = typeof OrchestratorMcpInitiativeReadInput.Type;
+export const OrchestratorMcpInitiativeReadResult = Schema.Struct({
+  initiative: Schema.NullOr(Initiative),
+});
+export type OrchestratorMcpInitiativeReadResult = typeof OrchestratorMcpInitiativeReadResult.Type;
+
+export const OrchestratorMcpInitiativeCreateInput = Schema.Struct({
+  ...InitiativeCreateInput.fields,
+  projectId: Schema.optional(
+    ProjectId.annotate({
+      description: "Omit for this thread's project; external MCP clients must supply it.",
+    }),
+  ),
+  coordinatorThreadId: Schema.optional(
+    ThreadId.annotate({
+      description:
+        "Existing coordinator thread. Omit to attach this thread; external MCP clients must supply it.",
+    }),
+  ),
+});
+export type OrchestratorMcpInitiativeCreateInput = typeof OrchestratorMcpInitiativeCreateInput.Type;
+export const OrchestratorMcpInitiativeUpdateInput = InitiativeUpdateInput;
+export const OrchestratorMcpInitiativeSetStatusInput = InitiativeSetStatusInput;
+export const OrchestratorMcpInitiativeResult = Initiative;
 
 const OrchestratorMcpPrompt = TrimmedNonEmptyString.check(Schema.isMaxLength(120_000)).annotate({
   description: "Complete task or message text for the target agent.",

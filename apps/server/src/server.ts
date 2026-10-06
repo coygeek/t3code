@@ -543,7 +543,9 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       yield* service.start();
     }),
   ).pipe(
-    Layer.provide(PullRequestWatchReactor.layer),
+    Layer.provide(
+      PullRequestWatchReactor.layer.pipe(Layer.provide(RuntimeLayer.layerInitiativeService)),
+    ),
     Layer.provide(layerPullRequestService),
     Layer.provide(ProjectionStoreV2.layer),
   ),
@@ -671,6 +673,7 @@ const layerMakeRoutes = Layer.mergeAll(
   // orchestrator uses, so MCP capability reporting can never drift from
   // what dispatch can actually serve.
   McpHttpServer.layer.pipe(
+    Layer.provide(RuntimeLayer.layerInitiativeService),
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
   ),
 ).pipe(

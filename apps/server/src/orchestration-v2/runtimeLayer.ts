@@ -1,3 +1,4 @@
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
@@ -79,6 +80,9 @@ const layerStores = Layer.mergeAll(
 
 export const layerEventSink = EventSink.layerFromStores.pipe(Layer.provide(layerStores));
 const layerEventSinkProvided = layerEventSink;
+export const layerInitiativeService = InitiativeService.layer.pipe(
+  Layer.provide(layerEventSinkProvided),
+);
 const layerProjectionMaintenanceProvided = ProjectionMaintenance.layer.pipe(
   Layer.provide(layerStores),
 );
@@ -150,6 +154,7 @@ const layerRunExecutionServiceProvided = RunExecutionService.layer.pipe(
 );
 
 const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pipe(
+  Layer.provide(layerInitiativeService),
   Layer.provide(
     Layer.mergeAll(
       layerContextHandoffServiceProvided,
@@ -198,6 +203,7 @@ const layerRunFinalizationServiceProvided = RunFinalizationService.layer.pipe(
 );
 
 const layerOrchestratorProvided = Orchestrator.layer.pipe(
+  Layer.provide(layerInitiativeService),
   Layer.provide(
     Layer.mergeAll(
       layerCheckpointServiceProvided,
@@ -263,6 +269,7 @@ const layerSecretRequestsProvided = SecretRequests.layer.pipe(
   Layer.provide(layerThreadManagementProvided),
 );
 const layerScheduledTaskProvided = ScheduledTaskService.layer.pipe(
+  Layer.provide(layerInitiativeService),
   Layer.provide(
     Layer.mergeAll(
       layerThreadLaunchProvided,
@@ -332,9 +339,12 @@ export const layerProduction = Layer.mergeAll(
   layerThreadLaunchProvided,
   layerThreadLifecycleProvided,
   layerScheduledTaskProvided,
+  layerInitiativeService,
   layerSecretRequestsProvided,
   UsageLimitRecoveryWorker.layer.pipe(
-    Layer.provide(Layer.mergeAll(ProjectionStore.layer, layerThreadManagementProvided)),
+    Layer.provide(
+      Layer.mergeAll(ProjectionStore.layer, layerThreadManagementProvided, layerInitiativeService),
+    ),
   ),
   layerProviderContinuationWorkerProvided,
   layerAgentSessionImporterProvided,

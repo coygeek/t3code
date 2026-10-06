@@ -11,6 +11,7 @@ import { projectEnvironment } from "../../state/projects";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
+import { SettingsRow } from "./components/SettingsRow";
 import {
   AndroidSettingsEnvironmentFilter,
   SettingsEnvironmentFilterHeader,
@@ -113,6 +114,7 @@ function ProjectOverviewContent(props: {
       </View>
 
       <SettingsSection title="Project">
+        <SettingsRow icon="list.number" label="Initiatives" target="SettingsInitiatives" />
         <View className="gap-3 p-4">
           <Text className="text-sm font-t3-medium text-foreground-muted">Name</Text>
           <View className="flex-row items-center gap-3">

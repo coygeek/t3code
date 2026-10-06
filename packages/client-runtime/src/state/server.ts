@@ -1084,6 +1084,26 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:scheduled-task:webhook-delivery",
       tag: WS_METHODS.scheduledTasksGetWebhookDelivery,
     }),
+    initiativesLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:initiatives:live",
+      tag: WS_METHODS.initiativesSubscribe,
+    }),
+    initiativesList: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:initiatives:list",
+      tag: WS_METHODS.initiativesList,
+    }),
+    createInitiative: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:initiatives:create",
+      tag: WS_METHODS.initiativesCreate,
+    }),
+    updateInitiative: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:initiatives:update",
+      tag: WS_METHODS.initiativesUpdate,
+    }),
+    setInitiativeStatus: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:initiatives:status",
+      tag: WS_METHODS.initiativesSetStatus,
+    }),
     /** Live scheduled-task list: snapshot on subscribe, fresh list after every server-side change. */
     scheduledTasksLive: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:scheduled-tasks:live",

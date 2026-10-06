@@ -4988,6 +4988,26 @@ export default function Sidebar() {
               activeSearchResultIndex={activeSearchResultIndex}
               onClearSearch={clearThreadSearch}
             />
+            {scopedProjectGroup &&
+            scopedProjectGroup.memberProjectRefs.some(
+              (ref) => serverConfigs.get(ref.environmentId)?.supportsInitiatives === true,
+            ) ? (
+              <Button
+                size="sm"
+                variant="ghost-muted"
+                className="mt-1 w-full justify-start"
+                onClick={() => {
+                  if (isMobile) setOpenMobile(false);
+                  void router.navigate({
+                    to: "/settings/projects",
+                    search: { project: scopedProjectGroup.projectKey, machine: undefined },
+                    hash: "project-initiatives",
+                  });
+                }}
+              >
+                Initiatives
+              </Button>
+            ) : null}
           </SidebarGroup>
         }
       >

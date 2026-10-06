@@ -38,6 +38,38 @@ Settings that are environment-wide stay read-only while a project is selected. W
 targets disagree, a control shows **Mixed** until you choose one value. Appearance, keyboard,
 and other phone-only settings ignore the filter.
 
+## Initiatives
+
+An initiative keeps a project's objective, definition of done, brief, plan, decisions and results
+with one coordinator thread. Create separate initiatives for independent objectives in the same
+repository. Each initiative belongs to its selected checkout and environment.
+
+On web and desktop, choose the project in the sidebar and open **Initiatives**, or select the
+project in **Settings → Project**. Choose **New initiative** to create a coordinator with the
+project's default model or attach an existing thread. Open the coordinator, choose its model,
+permissions and workspace, and send the first message to start work. An existing coordinator
+keeps its conversation and workspace.
+
+Give new constraints in the coordinator conversation while workers run. Ask it to delegate tasks,
+update the initiative's saved plan, record decisions and link results. Open a worker conversation
+to inspect its work or stop it. Finishing a worker or a turn does not complete the initiative.
+You can also edit the brief and progress directly in the overview. Switching the coordinator's
+provider through the normal handoff workflow keeps the initiative record.
+
+The overview shows schedules and webhook tasks that target the coordinator, plus its linked pull
+request watches. Use **Manage schedules and webhooks** to edit a task or create one targeting that
+coordinator. Manage pull requests from the coordinator conversation. These triggers keep their
+own enabled settings when you pause or complete an initiative.
+
+**Pause** prevents new automatic coordinator turns. Coordinator and worker turns already running
+continue, including their provider's native goals; stop them in their conversations if needed.
+You can still send the coordinator direction yourself. **Resume** delivers saved pending messages
+and allows future automatic wakes again.
+**Mark complete** also blocks automatic wakes and keeps the brief and history. **Reopen** makes
+the initiative active again with those records intact. Leaving or reopening the client does not
+start another copy of the work. The environment stores the initiative, so reconnect to it to see
+current progress from another device. Older servers need an update to support initiatives.
+
 ## Worktree branch names
 
 In **Settings → Source Control → Worktree branch naming**, choose a static prefix,

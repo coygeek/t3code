@@ -165,6 +165,15 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["model workspace environments projects inheritance checkout"],
   },
   {
+    id: "project-initiatives",
+    title: "Initiatives",
+    to: "/settings/projects",
+    scope: "project",
+    searchTerms: [
+      "coordinator objective brief plan workers blockers results pause resume complete reopen",
+    ],
+  },
+  {
     id: "project-overview",
     title: "Project overview",
     to: "/settings/projects",

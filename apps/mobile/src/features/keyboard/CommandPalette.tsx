@@ -227,6 +227,17 @@ export function CommandPalette(props: {
           }),
       },
       {
+        key: "initiatives",
+        kind: "action",
+        title: "Initiatives",
+        searchTerms: ["coordinator", "objective", "plan", "workers"],
+        run: () =>
+          navigation.navigate("SettingsSheet", {
+            screen: "SettingsContent",
+            params: { screen: "SettingsInitiatives" },
+          }),
+      },
+      {
         key: "scheduledTasks",
         kind: "action",
         title: "Scheduled tasks",

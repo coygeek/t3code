@@ -301,6 +301,25 @@ export function summarizeT3ToolCalls(
     case "worktree-status":
       label = phrase("Checked", "check", `worktree status ${times}`);
       break;
+    case "initiative-list":
+      label = phrase("Listed", "list", `initiatives ${times}`);
+      break;
+    case "initiative-read":
+      label = phrase("Read", "read", quantity(countEntities(entityIds("id")), "initiative"));
+      break;
+    case "initiative-create":
+      label = phrase("Created", "create", quantity(countEntities(entityIds("id")), "initiative"));
+      break;
+    case "initiative-update":
+      label = phrase("Updated", "update", quantity(countEntities(entityIds("id")), "initiative"));
+      break;
+    case "initiative-status":
+      label = phrase(
+        "Changed status of",
+        "change status of",
+        quantity(countEntities(entityIds("id")), "initiative"),
+      );
+      break;
     case "project-list":
       label = phrase("Listed", "list", `projects ${times}`);
       break;

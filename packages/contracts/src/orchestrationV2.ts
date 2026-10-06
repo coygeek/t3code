@@ -559,6 +559,8 @@ export const OrchestrationV2Run = Schema.Struct({
   contextHandoffId: Schema.NullOr(ContextHandoffId),
   /** Links server-generated restart continuations to the interrupted run. */
   restartContinuationOfRunId: Schema.optional(RunId),
+  /** Retains the exact limited run when an automatic retry waits in the queue. */
+  usageLimitContinuationOfRunId: Schema.optional(RunId),
   /**
    * Set on wake runs (background notifications, delegated task results,
    * restart continuations): when the work they continue started. Read it

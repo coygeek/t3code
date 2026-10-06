@@ -16,6 +16,7 @@ import * as GitWorkflowService from "../../../git/GitWorkflowService.ts";
 import * as ProviderAdapterRegistry from "../../../orchestration-v2/ProviderAdapterRegistry.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../../../project/ProjectService.ts";
+import * as InitiativeService from "../../../project/InitiativeService.ts";
 import * as ProjectSetupScriptRunner from "../../../project/ProjectSetupScriptRunner.ts";
 import * as ProviderRegistry from "../../../provider/Services/ProviderRegistry.ts";
 import * as ScheduledTaskService from "../../../scheduledTasks/ScheduledTaskService.ts";
@@ -36,6 +37,7 @@ const layerStubServices = Layer.mergeAll(
   Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
   Layer.mock(SecretRequests.SecretRequests)({}),
   Layer.mock(ProjectService.ProjectService)({}),
+  Layer.mock(InitiativeService.InitiativeService)({}),
   ServerSettings.layerTest({}),
   Layer.mock(GitWorkflowService.GitWorkflowService)({}),
   Layer.mock(ProjectSetupScriptRunner.ProjectSetupScriptRunner)({}),

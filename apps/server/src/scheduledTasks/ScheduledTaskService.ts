@@ -7,6 +7,7 @@ import {
   ScheduledTaskId,
   ThreadId,
   ScheduledTaskWebhookDeliveryId,
+  type OrchestrationV2CreationSource,
   type ScheduledTaskDeleteInput,
   type ScheduledTaskDeleteResult,
   type ScheduledTaskGetWebhookDeliveryInput,
@@ -44,6 +45,7 @@ import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts
 import * as Metrics from "../observability/Metrics.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import { isMissedFixedTimeRun, isSameSchedule, nextScheduledRunAt } from "./Schedule.ts";
 import {
@@ -134,6 +136,7 @@ export type WebhookDeliveryOutcome =
   | "queue_full"
   | "rate_limited"
   | "disabled"
+  | "initiative_inactive"
   | "rejected_signature"
   | "expired"
   | "not_found"
@@ -149,6 +152,7 @@ export type WebhookTriggerResult =
   | { readonly _tag: "not_found" }
   | { readonly _tag: "rejected_signature" }
   | { readonly _tag: "disabled" }
+  | { readonly _tag: "initiative_inactive" }
   | {
       readonly _tag: "rate_limited";
       /** Too many requests to this hook, or too many runs already waiting. */
@@ -216,6 +220,12 @@ interface WebhookDeliveryRow {
   readonly error: string | null;
 }
 
+/** Trusted service metadata, supplied by the transport rather than the request body. */
+interface ManualRunOrigin {
+  readonly createdBy: "user" | "agent";
+  readonly creationSource: OrchestrationV2CreationSource;
+}
+
 export class ScheduledTaskService extends Context.Service<
   ScheduledTaskService,
   {
@@ -234,6 +244,7 @@ export class ScheduledTaskService extends Context.Service<
     ) => Effect.Effect<ScheduledTaskDeleteResult, ScheduledTaskError>;
     readonly runNow: (
       input: ScheduledTaskRunNowInput,
+      origin?: ManualRunOrigin,
     ) => Effect.Effect<ScheduledTaskRunNowResult, ScheduledTaskError>;
     /** Issues a new URL token for a webhook task; the old URL stops working at once. */
     readonly rotateWebhookToken: (
@@ -396,6 +407,17 @@ export const layer = Layer.effect(
     const threadManagement = yield* ThreadManagementService.ThreadManagementService;
     const secretRequests = yield* SecretRequests.SecretRequests;
     const scheduler = yield* Scheduler.Scheduler;
+    const initiatives = yield* InitiativeService.InitiativeService;
+    const automaticWorkAllowed = (task: ScheduledTask) =>
+      task.threadId === null
+        ? Effect.succeed(true)
+        : initiatives
+            .isAutomaticWorkAllowed(ThreadId.make(task.threadId))
+            .pipe(
+              Effect.mapError((cause) =>
+                taskError("Could not check initiative status.", { taskId: task.id, cause }),
+              ),
+            );
     const readWebhookOrigin = yield* ScheduledTaskWebhookOrigin;
     // Webhook deliveries for one task dispatch in arrival order rather than
     // being dropped while an earlier delivery is still dispatching.
@@ -711,6 +733,7 @@ export const layer = Layer.effect(
       task: ScheduledTask,
       trigger: "scheduled" | "manual" | "webhook",
       webhook?: { readonly deliveryId: string; readonly prompt: string },
+      manualOrigin?: ManualRunOrigin,
     ) {
       const reserved = yield* Ref.modify(activeRuns, (active) => {
         if (active.has(task.id)) return [false, active] as const;
@@ -773,6 +796,18 @@ export const layer = Layer.effect(
           if (reason !== null) return yield* new WebhookDeliverySkipped({ reason });
         }
 
+        // A run-now request may come from the user or an agent. Keep this
+        // trusted origin separate from the task's original creator.
+        const createdBy = trigger === "manual" ? (manualOrigin?.createdBy ?? "user") : "system";
+        const creationSource =
+          trigger === "manual" ? (manualOrigin?.creationSource ?? active.creationSource) : "server";
+        if (trigger === "manual" && createdBy !== "user" && !(yield* automaticWorkAllowed(active)))
+          return yield* taskError("The initiative is paused or completed.", { taskId: active.id });
+
+        // Accepted webhooks already own a delivery. Their durable dispatch can
+        // queue behind an inactive initiative; the orchestrator starts it on resume.
+        if (trigger === "scheduled" && !(yield* automaticWorkAllowed(active))) return active;
+
         yield* markRunning(active.id, startedAtIso);
         yield* notifyChanged;
 
@@ -788,7 +823,6 @@ export const layer = Layer.effect(
         // after the poll read are honoured. A webhook prompt was rendered
         // from the row when the request arrived.
         const prompt = webhook?.prompt ?? active.prompt;
-
         // Effect.exit (not Effect.result) so defects and interruptions in the
         // dispatch are also captured and recorded as a failed run instead of
         // aborting before markCompleted.
@@ -809,8 +843,8 @@ export const layer = Layer.effect(
                     text: prompt,
                     attachments: [],
                   },
-                  createdBy: active.createdBy,
-                  creationSource: active.creationSource,
+                  createdBy,
+                  creationSource,
                 }),
               )
             : yield* Effect.exit(
@@ -825,8 +859,8 @@ export const layer = Layer.effect(
                   modelSelection: active.modelSelection,
                   // Scheduled prompts must not interrupt tools in the bound thread.
                   mode: "queue",
-                  createdBy: active.createdBy,
-                  creationSource: active.creationSource,
+                  createdBy,
+                  creationSource,
                 }),
               );
 
@@ -910,11 +944,14 @@ export const layer = Layer.effect(
       yield* Effect.forEach(
         due,
         ({ task, dueAt }) =>
-          Effect.suspend(() =>
-            isMissedFixedTimeRun(task.schedule, dueAt, now)
+          Effect.gen(function* () {
+            // Keep the due occurrence while inactive, including fixed-time runs
+            // that would otherwise advance to their next slot without dispatch.
+            if (!(yield* automaticWorkAllowed(task))) return;
+            yield* isMissedFixedTimeRun(task.schedule, dueAt, now)
               ? rescheduleMissedRun(task, now)
-              : runTask(task, "scheduled"),
-          ).pipe(
+              : runTask(task, "scheduled");
+          }).pipe(
             Effect.catch((cause) =>
               Effect.logWarning("Scheduled task run failed", { taskId: task.id, cause }),
             ),
@@ -1156,7 +1193,7 @@ export const layer = Layer.effect(
         Effect.as({ id: input.id }),
       );
 
-    const runNow: ScheduledTaskService["Service"]["runNow"] = (input: ScheduledTaskRunNowInput) =>
+    const runNow: ScheduledTaskService["Service"]["runNow"] = (input, origin) =>
       Effect.gen(function* () {
         const task = yield* loadTask(input.id);
         if (task.schedule.type === "webhook") {
@@ -1165,7 +1202,7 @@ export const layer = Layer.effect(
             taskId: input.id,
           });
         }
-        const next = yield* runTask(task, "manual").pipe(
+        const next = yield* runTask(task, "manual", undefined, origin).pipe(
           Effect.mapError((cause) =>
             taskError("Could not run schedule task.", { taskId: input.id, cause }),
           ),
@@ -1565,6 +1602,15 @@ export const layer = Layer.effect(
               yield* log("expired", { signatureVerified: signature !== null });
               yield* observe("expired");
               return { _tag: "expired" as const };
+            }
+
+            if (!(yield* automaticWorkAllowed(task))) {
+              yield* log("disabled", {
+                signatureVerified: signature !== null,
+                error: "The initiative is paused or completed.",
+              });
+              yield* observe("initiative_inactive");
+              return yield* releaseClaim({ _tag: "initiative_inactive" as const });
             }
 
             const rendered = renderWebhookPrompt(task.prompt, request);

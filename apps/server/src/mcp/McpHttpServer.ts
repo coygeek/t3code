@@ -33,6 +33,9 @@ import * as AttachmentHandlers from "./toolkits/attachment/handlers.ts";
 import { ThreadToolkit } from "./toolkits/thread/tools.ts";
 import * as ThreadHandlers from "./toolkits/thread/handlers.ts";
 import * as ThreadMetadataMcpService from "./ThreadMetadataMcpService.ts";
+import * as InitiativeMcpService from "./InitiativeMcpService.ts";
+import { InitiativeToolkit } from "./toolkits/initiative/tools.ts";
+import * as InitiativeHandlers from "./toolkits/initiative/handlers.ts";
 import * as McpSessionRegistry from "./McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
 import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
@@ -706,6 +709,11 @@ export const layerThreadToolkit = McpServer.toolkit(ThreadToolkit).pipe(
   Layer.provide(ThreadHandlers.layer),
 );
 
+export const layerInitiativeToolkit = McpServer.toolkit(InitiativeToolkit).pipe(
+  Layer.provide(InitiativeHandlers.layer),
+  Layer.provide(InitiativeMcpService.layer),
+);
+
 const layerWorktreeToolkitRegistration = McpServer.toolkit(WorktreeToolkit).pipe(
   Layer.provide(WorktreeHandlers.layer),
   Layer.provide(WorktreeMcpService.layer),
@@ -754,6 +762,7 @@ const layerMcpTransport = McpServer.layerHttp({
 export const layer = Layer.mergeAll(
   layerPreviewToolkit,
   layerOrchestratorToolkit,
+  layerInitiativeToolkit,
   layerThreadToolkit,
   layerAttachmentRegistration,
   layerProjectRegistration,

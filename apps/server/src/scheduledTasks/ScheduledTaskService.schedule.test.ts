@@ -11,6 +11,7 @@ import * as TestClock from "effect/testing/TestClock";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as SqlitePersistence from "../persistence/Layers/Sqlite.ts";
 import * as ScheduledTaskService from "./ScheduledTaskService.ts";
 
@@ -19,6 +20,9 @@ const decodeUpsertInput = Schema.decodeUnknownEffect(ScheduledTaskUpsertInput);
 it.effect("rejects a stale form save after deletion while preserving explicit-id creates", () =>
   Effect.gen(function* () {
     const layerDependencies = Layer.mergeAll(
+      Layer.mock(InitiativeService.InitiativeService)({
+        isAutomaticWorkAllowed: () => Effect.succeed(true),
+      }),
       NodeCrypto.layer,
       Scheduler.layer,
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
@@ -62,6 +66,9 @@ it.effect("preserves a due run when a save only pads the scheduled hour", () =>
     yield* TestClock.setTime(DateTime.toEpochMillis(dueAt) - 1_000);
 
     const layerDependencies = Layer.mergeAll(
+      Layer.mock(InitiativeService.InitiativeService)({
+        isAutomaticWorkAllowed: () => Effect.succeed(true),
+      }),
       NodeCrypto.layer,
       Scheduler.layer,
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),

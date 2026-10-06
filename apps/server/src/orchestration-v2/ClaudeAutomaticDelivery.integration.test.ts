@@ -24,6 +24,7 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as SqlitePersistence from "../persistence/Layers/Sqlite.ts";
@@ -317,6 +318,11 @@ it.effect.each(["child completion", "scheduled message", "user steering"] as con
                   ),
                   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
                   Layer.provide(Layer.mock(SecretRequests.SecretRequests)({})),
+                  Layer.provide(
+                    Layer.mock(InitiativeService.InitiativeService)({
+                      isAutomaticWorkAllowed: () => Effect.succeed(true),
+                    }),
+                  ),
                   Layer.provide(
                     Layer.mergeAll(
                       NodeCrypto.layer,

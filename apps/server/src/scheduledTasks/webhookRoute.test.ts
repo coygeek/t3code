@@ -332,3 +332,15 @@ describe("webhook route", () => {
     }
   });
 });
+
+it("answers inactive initiatives distinctly from disabled webhook tasks", async () => {
+  const { handler, dispose } = handlerFor(() => Effect.succeed({ _tag: "initiative_inactive" }));
+  try {
+    const response = await handler(post("/api/hooks/scheduled-task%3Ahook/tok", "{}"));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "initiative_inactive" });
+    expect(response.headers.get("x-t3-hook-outcome")).toBe("initiative_inactive");
+  } finally {
+    await dispose();
+  }
+});

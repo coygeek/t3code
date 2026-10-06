@@ -33,6 +33,7 @@ import {
   SettingResetButton,
   SettingsPageContainer,
   SettingsRow,
+  SettingsSearchTarget,
   SettingsSection,
 } from "./settingsLayout";
 import {
@@ -40,6 +41,7 @@ import {
   ProjectFaviconPickerDialog,
 } from "./ProjectFaviconPickerDialog";
 import { ProjectActionsSettings } from "./ProjectActionsSettings";
+import { ProjectInitiatives } from "./ProjectInitiatives";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { projectGroupTitleNeedsUpdate } from "./ProjectSettingsPanel.logic";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
@@ -409,6 +411,22 @@ function ProjectDetail({
   return (
     <>
       <SettingsPageContainer className="gap-6">
+        <SettingsSearchTarget
+          id="project-initiatives"
+          className="space-y-6"
+          aria-label="Project initiatives"
+        >
+          {group.memberProjects.map((member) => (
+            <ProjectInitiatives
+              key={member.physicalProjectKey}
+              environmentId={member.environmentId}
+              projectId={member.id}
+              {...(group.memberProjects.length > 1
+                ? { label: `${member.environmentLabel ?? "Environment"} · ${member.workspaceRoot}` }
+                : {})}
+            />
+          ))}
+        </SettingsSearchTarget>
         <Alert variant="info">
           <InfoIcon aria-hidden />
           <AlertDescription>
