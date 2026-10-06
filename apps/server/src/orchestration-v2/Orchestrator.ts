@@ -70,6 +70,8 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import * as ProjectStore from "./ProjectStore.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
+import { isAutomaticInitiativeMessage } from "./InitiativeWork.ts";
 import {
   isCheckpointRestoreIsolated,
   SHARED_WORKSPACE_RESTORE_MESSAGE,
@@ -785,6 +787,11 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const runtimePolicy = yield* RuntimePolicyV2;
   const threadForkService = yield* ThreadForkServiceV2;
   const threadDispatch = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+  const initiatives = yield* Effect.serviceOption(InitiativeService.InitiativeService);
+  const automaticInitiativeWorkAllowed = (threadId: ThreadId) =>
+    Option.isNone(initiatives)
+      ? Effect.succeed(true)
+      : initiatives.value.isAutomaticWorkAllowed(threadId);
 
   const mapDispatchError =
     (command: OrchestrationV2ServerCommand) =>
@@ -1243,12 +1250,29 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             (left, right) =>
               DateTime.toEpochMillis(right.updatedAt) - DateTime.toEpochMillis(left.updatedAt),
           )[0]?.lastError ?? null;
-      if (usageLimitBlockedRun(projection.runs, projection.turnItems, sessionError) !== null) {
-        return;
-      }
-      const queuedRun = nextQueuedRun(projection);
+      const limitedRun = usageLimitBlockedRun(projection.runs, projection.turnItems, sessionError);
+      const automaticWorkAllowed = yield* automaticInitiativeWorkAllowed(threadId);
+      const queuedRun = queuedRunsInDeliveryOrder(projection).find((run) => {
+        const message = projection.messages.find((candidate) => candidate.id === run.userMessageId);
+        return (
+          automaticWorkAllowed || (message !== undefined && !isAutomaticInitiativeMessage(message))
+        );
+      });
       if (queuedRun === undefined) {
         return;
+      }
+      if (limitedRun !== null) {
+        const recovery = projection.thread.limitRecovery;
+        const failure = latestRootProviderFailure(limitedRun, projection.turnItems);
+        const recoveryNow = yield* DateTime.now;
+        if (
+          queuedRun.usageLimitContinuationOfRunId !== limitedRun.id ||
+          recovery?.autoResume !== true ||
+          recovery.runId !== limitedRun.id ||
+          recovery.resetAt !== failure?.resetAt ||
+          Date.parse(recovery.resetAt) > DateTime.toEpochMillis(recoveryNow)
+        )
+          return;
       }
       // A provider that just failed will likely fail the next message too.
       // Hold the queue so the user decides when to resume it. Validation
@@ -4564,11 +4588,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         projection = yield* getProjectionWithPendingEvents(command.threadId, events);
       }
       const modelSelection = command.modelSelection ?? projection.thread.modelSelection;
+      const initiativeWorkBlocked =
+        isAutomaticInitiativeMessage(command) &&
+        !(yield* automaticInitiativeWorkAllowed(command.threadId).pipe(mapDispatchError(command)));
       let dispatchMode = resolveMessageDispatchIntent(
         projection,
         command.dispatchMode,
         command.deliveryIntent,
       );
+      if (initiativeWorkBlocked) dispatchMode = { type: "queue_after_active" };
       if (dispatchMode.type === "steer_active") {
         const targetRunId = dispatchMode.targetRunId;
         const target = projection.runs.find((run) => run.id === targetRunId);
@@ -4644,6 +4672,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       // Route durable mailbox deliveries under the thread lock, using the live
       // session's capabilities. Never interrupt/restart a turn for a notification.
       if (
+        !initiativeWorkBlocked &&
         delegatedCompletion !== undefined &&
         delegatedCompletion.taskIds.every(
           (id) => projection.subagents.find((task) => task.id === id)?.completionWake === "always",
@@ -4898,6 +4927,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           checkpointId: null,
           contextHandoffId: null,
           ...(command.sourcePlanRef === undefined ? {} : { sourcePlanRef: command.sourcePlanRef }),
+          ...(command.usageLimitContinuationOfRunId === undefined
+            ? {}
+            : { usageLimitContinuationOfRunId: command.usageLimitContinuationOfRunId }),
           ...(command.restartContinuationOfRunId === undefined
             ? {}
             : { restartContinuationOfRunId: command.restartContinuationOfRunId }),
@@ -5237,6 +5269,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           checkpointId: null,
           contextHandoffId: legacyImportHandoff?.id ?? null,
           ...(command.sourcePlanRef === undefined ? {} : { sourcePlanRef: command.sourcePlanRef }),
+          ...(command.usageLimitContinuationOfRunId === undefined
+            ? {}
+            : { usageLimitContinuationOfRunId: command.usageLimitContinuationOfRunId }),
           ...(command.restartContinuationOfRunId === undefined
             ? {}
             : { restartContinuationOfRunId: command.restartContinuationOfRunId }),
@@ -5933,6 +5968,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           legacyImportRecoveryHandoff?.id ??
           null,
         ...(command.sourcePlanRef === undefined ? {} : { sourcePlanRef: command.sourcePlanRef }),
+        ...(command.usageLimitContinuationOfRunId === undefined
+          ? {}
+          : { usageLimitContinuationOfRunId: command.usageLimitContinuationOfRunId }),
         ...(command.restartContinuationOfRunId === undefined
           ? {}
           : { restartContinuationOfRunId: command.restartContinuationOfRunId }),
@@ -10106,9 +10144,49 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       default:
         return yield* dispatchUnsupported(command);
     }
+    const plannedEvents = yield* Ref.get(events);
+    const deferredRunIds = new Set<RunId>();
+    for (const event of plannedEvents) {
+      if (event.type !== "run.created" || event.payload.status !== "starting") continue;
+      const message = plannedEvents.find(
+        (candidate) =>
+          candidate.type === "message.updated" &&
+          candidate.payload.id === event.payload.userMessageId,
+      );
+      if (
+        message?.type === "message.updated" &&
+        isAutomaticInitiativeMessage(message.payload) &&
+        !(yield* automaticInitiativeWorkAllowed(event.threadId).pipe(mapDispatchError(command)))
+      ) {
+        deferredRunIds.add(event.payload.id);
+      }
+    }
     return {
-      events: yield* Ref.get(events),
-      effects: yield* Ref.get(effects),
+      // Keep the accepted message and its identity. Resume promotes this same run,
+      // so recorded webhook deliveries and worker results are never redispatched.
+      events: plannedEvents.map((event): OrchestrationV2DomainEvent =>
+        event.type === "run.created" && deferredRunIds.has(event.payload.id)
+          ? {
+              ...event,
+              payload: {
+                ...event.payload,
+                status: "queued",
+                queuePosition: event.payload.ordinal,
+                workStartedAt: undefined,
+              },
+            }
+          : event.type === "turn-item.updated" &&
+              event.payload.type === "user_message" &&
+              event.payload.runId !== null &&
+              deferredRunIds.has(event.payload.runId)
+            ? { ...event, payload: { ...event.payload, inputIntent: "queued_turn" } }
+            : event,
+      ),
+      effects: (yield* Ref.get(effects)).filter(
+        (effect) =>
+          effect.request.type !== "provider-turn.start" ||
+          !deferredRunIds.has(effect.request.runId),
+      ),
       ...(cancelUnsettledEffects === undefined ? {} : { cancelUnsettledEffects }),
     };
   });
@@ -10366,6 +10444,44 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       Stream.runForEach(handleTerminalRun),
       Effect.forkDetach,
     );
+
+  // Pausing preserves accepted automatic messages in the ordinary queue. Both
+  // lifecycle changes and the provider boundary's racing requeue can make them
+  // ready again. Neither path clears the user's existing queue hold.
+  const resumeInitiativeWork = (threadId: ThreadId) =>
+    threadDispatch
+      .withLock(
+        threadId,
+        Effect.gen(function* () {
+          if (!(yield* automaticInitiativeWorkAllowed(threadId))) return;
+          yield* startNextQueuedRun(threadId);
+          yield* offerDelegatedCompletionDeliveries(threadId);
+        }),
+      )
+      .pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Failed to resume queued initiative work", { threadId, cause }),
+        ),
+      );
+  if (Option.isSome(initiatives)) {
+    yield* initiatives.value.lifecycleChanges.pipe(
+      Stream.filter((change) => change.status === "active"),
+      Stream.runForEach((change) => resumeInitiativeWork(change.threadId)),
+      Effect.forkDetach,
+    );
+    yield* eventSink
+      .stream({ afterSequence: terminalEventsAfterSequence, eventType: "run.updated" })
+      .pipe(
+        Stream.filter(
+          (stored) =>
+            stored.event.type === "run.updated" &&
+            stored.event.payload.status === "queued" &&
+            String(stored.commandId).startsWith("command:initiative-defer:"),
+        ),
+        Stream.runForEach((stored) => resumeInitiativeWork(stored.event.threadId)),
+        Effect.forkDetach,
+      );
+  }
 
   // Settles child results and completion deliveries whose runs ended without
   // the listener above: before this boot, or in runtime reconciliation, which

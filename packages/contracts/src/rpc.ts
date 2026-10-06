@@ -1,3 +1,12 @@
+import {
+  Initiative,
+  InitiativeCreateInput,
+  InitiativeUpdateInput,
+  InitiativeSetStatusInput,
+  InitiativeListInput,
+  InitiativeListResult,
+  InitiativeError,
+} from "./initiative.ts";
 import { OrchestrationDispatchCommandError } from "./orchestrationDispatch.ts";
 import {
   ChatGptReconnectProfileInput,
@@ -474,6 +483,11 @@ export const WS_METHODS = {
   serverRefreshUsageRates: "server.refreshUsageRates",
 
   // Scheduled tasks
+  initiativesList: "initiatives.list",
+  initiativesSubscribe: "initiatives.subscribe",
+  initiativesCreate: "initiatives.create",
+  initiativesUpdate: "initiatives.update",
+  initiativesSetStatus: "initiatives.setStatus",
   scheduledTasksList: "scheduledTasks.list",
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
   scheduledTasksUpsert: "scheduledTasks.upsert",
@@ -1640,6 +1654,33 @@ const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServerLifecyc
   stream: true,
 });
 
+const WsInitiativesListRpc = Rpc.make(WS_METHODS.initiativesList, {
+  payload: InitiativeListInput,
+  success: InitiativeListResult,
+  error: Schema.Union([InitiativeError, EnvironmentAuthorizationError]),
+});
+const WsInitiativesSubscribeRpc = Rpc.make(WS_METHODS.initiativesSubscribe, {
+  payload: InitiativeListInput,
+  success: InitiativeListResult,
+  error: Schema.Union([InitiativeError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+const WsInitiativesCreateRpc = Rpc.make(WS_METHODS.initiativesCreate, {
+  payload: InitiativeCreateInput,
+  success: Initiative,
+  error: Schema.Union([InitiativeError, EnvironmentAuthorizationError]),
+});
+const WsInitiativesUpdateRpc = Rpc.make(WS_METHODS.initiativesUpdate, {
+  payload: InitiativeUpdateInput,
+  success: Initiative,
+  error: Schema.Union([InitiativeError, EnvironmentAuthorizationError]),
+});
+const WsInitiativesSetStatusRpc = Rpc.make(WS_METHODS.initiativesSetStatus, {
+  payload: InitiativeSetStatusInput,
+  success: Initiative,
+  error: Schema.Union([InitiativeError, EnvironmentAuthorizationError]),
+});
+
 const WsScheduledTasksListRpc = Rpc.make(WS_METHODS.scheduledTasksList, {
   payload: ScheduledTaskListInput,
   success: ScheduledTaskListResult,
@@ -1789,6 +1830,11 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
+  WsInitiativesListRpc,
+  WsInitiativesSubscribeRpc,
+  WsInitiativesCreateRpc,
+  WsInitiativesUpdateRpc,
+  WsInitiativesSetStatusRpc,
   WsScheduledTasksListRpc,
   WsScheduledTasksSubscribeRpc,
   WsScheduledTasksUpsertRpc,

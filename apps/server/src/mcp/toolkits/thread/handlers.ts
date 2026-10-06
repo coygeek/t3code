@@ -89,7 +89,7 @@ export const layer = ThreadToolkit.toLayer({
           message: "The scheduled task was not found.",
         });
       const { task } = yield* scheduler
-        .runNow({ id: input.taskId })
+        .runNow({ id: input.taskId }, { createdBy: "agent", creationSource: "mcp" })
         .pipe(Effect.mapError(unavailable));
       return {
         taskId: task.id,

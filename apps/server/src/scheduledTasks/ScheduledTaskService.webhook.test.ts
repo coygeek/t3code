@@ -10,6 +10,7 @@ import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Metric from "effect/Metric";
 import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
 import * as EffectScheduler from "effect/Scheduler";
 import * as Schema from "effect/Schema";
 import * as TestClock from "effect/testing/TestClock";
@@ -17,13 +18,17 @@ import * as TestClock from "effect/testing/TestClock";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as SqlitePersistence from "../persistence/Layers/Sqlite.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as ScheduledTaskService from "./ScheduledTaskService.ts";
 
 const decodeUpsertInput = Schema.decodeUnknownEffect(ScheduledTaskUpsertInput);
 
-type LaunchInput = ThreadLaunchService.ThreadLaunchInput;
+type LaunchInput = Pick<
+  ThreadLaunchService.ThreadLaunchInput,
+  "commandId" | "projectId" | "initialMessage" | "createdBy" | "creationSource"
+>;
 
 const webhookTaskInput = (overrides: Record<string, unknown> = {}) =>
   decodeUpsertInput({
@@ -70,12 +75,19 @@ const withService = <A, E>(
     /** Secrets the user entered for an agent, by ref; consuming one removes it. */
     readonly secretsByRef: Map<string, string>;
   }) => Effect.Effect<A, E, never>,
-  options: { readonly gate?: Deferred.Deferred<void>; readonly relayHookBaseUrl?: string } = {},
+  options: {
+    readonly gate?: Deferred.Deferred<void>;
+    readonly relayHookBaseUrl?: string;
+    readonly automaticWorkAllowed?: Effect.Effect<boolean>;
+  } = {},
 ) =>
   Effect.gen(function* () {
     const launches = yield* Queue.unbounded<LaunchInput>();
     const secretsByRef = new Map<string, string>();
     const layerDependencies = Layer.mergeAll(
+      Layer.mock(InitiativeService.InitiativeService)({
+        isAutomaticWorkAllowed: () => options.automaticWorkAllowed ?? Effect.succeed(true),
+      }),
       NodePlatformCrypto.layer,
       Scheduler.layer,
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({
@@ -85,7 +97,23 @@ const withService = <A, E>(
             Effect.as({ threadId: "thread-1", resumed: false } as never),
           ),
       }),
-      Layer.mock(ThreadManagementService.ThreadManagementService)({}),
+      Layer.mock(ThreadManagementService.ThreadManagementService)({
+        sendToThread: (input) =>
+          Queue.offer(launches, {
+            commandId: input.commandId,
+            projectId: input.projectId,
+            createdBy: input.createdBy,
+            creationSource: input.creationSource,
+            initialMessage: {
+              messageId: input.messageId,
+              text: input.text,
+              attachments: input.attachments,
+            },
+          }).pipe(
+            Effect.andThen(options.gate ? Deferred.await(options.gate) : Effect.void),
+            Effect.as({} as ThreadManagementService.ThreadManagementSendResult),
+          ),
+      }),
       Layer.mock(SecretRequests.SecretRequests)({
         consume: ({ ref }) => {
           const value = secretsByRef.get(ref);
@@ -137,6 +165,8 @@ it.effect("dispatches exactly the rendered prompt and logs the delivery", () =>
       });
       assert.equal(delivery.body, new TextDecoder().decode(pullRequestBody));
       assert.equal(delivery.renderedPrompt, launched.initialMessage?.text);
+      assert.equal(launched.createdBy, "system");
+      assert.equal(launched.creationSource, "server");
     }),
   ),
 );
@@ -893,4 +923,73 @@ it.effect("counts each handled request by what happened to it", () =>
       assert.equal((yield* deliveriesCounted("duplicate", "relay")) - before.duplicate, 1);
     }),
   ),
+);
+
+it.effect(
+  "declines inactive initiative webhooks without changing the task or claiming a relay replay",
+  () =>
+    Effect.gen(function* () {
+      const allowed = yield* Ref.make(false);
+      yield* withService(
+        ({ service, launches }) =>
+          Effect.gen(function* () {
+            const { task } = yield* service.upsert(
+              yield* webhookTaskInput({ threadId: "initiative-coordinator" }),
+            );
+            const request = requestFor(task, { relayDeliveryId: "inactive-initiative-delivery" });
+            assert.equal((yield* service.triggerWebhook(request))._tag, "initiative_inactive");
+            assert.equal(yield* Queue.size(launches), 0);
+            const current = (yield* service.list()).tasks[0]!;
+            assert.equal(current.enabled, true);
+            assert.equal(current.runCount, 0);
+            assert.equal(current.lastRunStatus, "never");
+            const declined = (yield* service.listWebhookDeliveries({ id: task.id })).deliveries[0]!;
+            assert.equal(declined.outcome, "disabled");
+            const { delivery } = yield* service.getWebhookDelivery({
+              id: task.id,
+              deliveryId: declined.id,
+            });
+            assert.equal(delivery.error, "The initiative is paused or completed.");
+
+            yield* Ref.set(allowed, true);
+            assert.equal((yield* service.triggerWebhook(request))._tag, "accepted");
+            assert.equal(
+              (yield* Queue.take(launches)).initialMessage?.text,
+              "Review this PR: https://github.com/org/repo/pull/45",
+            );
+          }),
+        { automaticWorkAllowed: Ref.get(allowed) },
+      );
+    }),
+);
+
+it.effect(
+  "retains accepted webhook deliveries when the initiative pauses before their dispatch",
+  () =>
+    Effect.gen(function* () {
+      const allowed = yield* Ref.make(true);
+      const gate = yield* Deferred.make<void>();
+      yield* withService(
+        ({ service, launches }) =>
+          Effect.gen(function* () {
+            const { task } = yield* service.upsert(
+              yield* webhookTaskInput({ threadId: "initiative-coordinator" }),
+            );
+            assert.equal((yield* service.triggerWebhook(requestFor(task)))._tag, "accepted");
+            yield* Queue.take(launches);
+            assert.equal((yield* service.triggerWebhook(requestFor(task)))._tag, "accepted");
+            yield* Ref.set(allowed, false);
+            yield* Deferred.succeed(gate, undefined);
+            // The accepted prompt reaches durable dispatch, whose initiative guard
+            // keeps it queued until resume. It is not dropped as a failed delivery.
+            yield* Queue.take(launches);
+            const deliveries = (yield* service.listWebhookDeliveries({ id: task.id })).deliveries;
+            assert.deepEqual(
+              deliveries.map((delivery) => delivery.outcome),
+              ["accepted", "accepted"],
+            );
+          }),
+        { automaticWorkAllowed: Ref.get(allowed), gate },
+      );
+    }),
 );

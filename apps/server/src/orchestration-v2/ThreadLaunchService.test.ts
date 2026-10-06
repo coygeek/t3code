@@ -48,6 +48,7 @@ import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ProviderRegistryMock from "../provider/testUtils/providerRegistryMock.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ScheduledTasks from "../scheduledTasks/ScheduledTaskService.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
@@ -294,7 +295,7 @@ it.effect.each(
     (["user", "agent"] as const).map((createdBy) => ({ target, createdBy })),
   ),
 )(
-  "attributes $createdBy-configured automations in $target threads without changing their prompt",
+  "attributes a manual run of a $createdBy-configured task in a $target thread to the user",
   ({ target, createdBy }) => {
     const harness = makeHarness();
     const layerScheduledTasks = ScheduledTasks.layer.pipe(
@@ -304,6 +305,9 @@ it.effect.each(
           NodeCrypto.layer,
           Scheduler.layer,
           Layer.mock(SecretRequests.SecretRequests)({}),
+          Layer.mock(InitiativeService.InitiativeService)({
+            isAutomaticWorkAllowed: () => Effect.succeed(true),
+          }),
         ),
       ),
     );
@@ -332,6 +336,7 @@ it.effect.each(
         createdBy,
         creationSource: createdBy === "agent" ? "mcp" : "web",
       });
+      assert.equal(task.createdBy, createdBy);
       const result = yield* tasks.runNow({ id: task.id });
       assert.equal(result.task.lastRunStatus, "succeeded");
       const projectThreads = yield* threads.listProjectThreads({
@@ -347,7 +352,7 @@ it.effect.each(
       const wire = yield* encodeThreadProjection(projection);
       assert.equal(wire.messages[0]?.text, task.prompt);
       assert.equal(wire.messages[0]?.scheduledTaskId, task.id);
-      assert.equal(wire.messages[0]?.createdBy, createdBy);
+      assert.equal(wire.messages[0]?.createdBy, "user");
       const turnItem = wire.turnItems.find(
         (item): item is Extract<typeof item, { type: "user_message" }> =>
           item.type === "user_message",

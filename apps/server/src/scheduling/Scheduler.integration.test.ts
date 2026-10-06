@@ -1,3 +1,4 @@
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { assert, expect, it } from "@effect/vitest";
 import {
@@ -118,7 +119,11 @@ it.effect.each(["on time", "after restart"])(
       const layerWorkers = Layer.mergeAll(
         ScheduledTasks.layer,
         UsageLimitRecoveryWorker.layer,
-      ).pipe(Layer.provide(layerDependencies), Layer.provide(Scheduler.layer));
+      ).pipe(
+        Layer.provide(InitiativeService.layer),
+        Layer.provide(layerDependencies),
+        Layer.provide(Scheduler.layer),
+      );
       yield* Effect.gen(function* () {
         const tasks = yield* ScheduledTasks.ScheduledTaskService;
         const { task } = yield* tasks.upsert({

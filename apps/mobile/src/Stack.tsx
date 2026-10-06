@@ -102,6 +102,11 @@ import {
 } from "./features/settings/SettingsOpenSourceLicensesRouteScreen";
 import { SettingsProjectGroupingRouteScreen } from "./features/settings/SettingsProjectGroupingRouteScreen";
 import { SettingsProjectOverviewRouteScreen } from "./features/settings/SettingsProjectOverviewRouteScreen";
+import {
+  SettingsInitiativesRouteScreen,
+  SettingsInitiativeRouteScreen,
+  SettingsInitiativeEditorRouteScreen,
+} from "./features/settings/SettingsInitiativesRouteScreen";
 import { UsageLimitAccountScreen } from "./features/usage/UsageLimitsPooled";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
@@ -293,6 +298,20 @@ const SettingsContentStack = createNativeStackNavigator({
       screen: SettingsProjectOverviewRouteScreen,
       linking: "project",
       options: { title: "Project overview" },
+    }),
+    SettingsInitiatives: createNativeStackScreen({
+      screen: SettingsInitiativesRouteScreen,
+      linking: "initiatives",
+      options: { title: "Initiatives" },
+    }),
+    SettingsInitiative: createNativeStackScreen({
+      screen: SettingsInitiativeRouteScreen,
+      linking: "initiatives/:environmentId/:initiativeId",
+      options: { title: "Initiative" },
+    }),
+    SettingsInitiativeEditor: createNativeStackScreen({
+      screen: SettingsInitiativeEditorRouteScreen,
+      options: { title: "Initiative brief" },
     }),
     SettingsKeyboard: createNativeStackScreen({
       screen: SettingsKeyboardRouteScreen,

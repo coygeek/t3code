@@ -201,6 +201,7 @@ import { linkCreatedPullRequest } from "./git/linkCreatedPullRequest.ts";
 import * as ReviewService from "./review/ReviewService.ts";
 import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts";
 import * as ProjectService from "./project/ProjectService.ts";
+import * as InitiativeService from "./project/InitiativeService.ts";
 import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
 import { projectMutationOperation } from "./project/ProjectMutation.ts";
 import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts";
@@ -1218,6 +1219,7 @@ const layerWsRpc = (
       const threadLaunch = yield* ThreadLaunchService.ThreadLaunchService;
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
+      const initiatives = yield* InitiativeService.InitiativeService;
       const secretRequests = yield* SecretRequests.SecretRequests;
       const pullRequests = yield* PullRequestService.PullRequestService;
       const pullRequestSync = yield* PullRequestSyncReactor.PullRequestSyncReactor;
@@ -1720,6 +1722,7 @@ const layerWsRpc = (
             settings,
             shellResumeCompletionMarker: true,
             threadResumeCompletionMarker: true,
+            supportsInitiatives: true,
             threadSnapshotPagination: true,
             ...Option.match(scratchWorkspaceRoot, {
               onNone: () => ({}),
@@ -2064,6 +2067,26 @@ const layerWsRpc = (
               "orchestration_v2.thread_id": input.threadId,
             },
           ),
+        [WS_METHODS.initiativesList]: (input) =>
+          observeRpcEffect(WS_METHODS.initiativesList, initiatives.list(input), {
+            "rpc.aggregate": "initiatives",
+          }),
+        [WS_METHODS.initiativesSubscribe]: (input) =>
+          observeRpcStream(WS_METHODS.initiativesSubscribe, initiatives.subscribe(input), {
+            "rpc.aggregate": "initiatives",
+          }),
+        [WS_METHODS.initiativesCreate]: (input) =>
+          observeRpcEffect(WS_METHODS.initiativesCreate, initiatives.create(input), {
+            "rpc.aggregate": "initiatives",
+          }),
+        [WS_METHODS.initiativesUpdate]: (input) =>
+          observeRpcEffect(WS_METHODS.initiativesUpdate, initiatives.update(input), {
+            "rpc.aggregate": "initiatives",
+          }),
+        [WS_METHODS.initiativesSetStatus]: (input) =>
+          observeRpcEffect(WS_METHODS.initiativesSetStatus, initiatives.setStatus(input), {
+            "rpc.aggregate": "initiatives",
+          }),
         [WS_METHODS.scheduledTasksList]: (_input) =>
           observeRpcEffect(
             WS_METHODS.scheduledTasksList,

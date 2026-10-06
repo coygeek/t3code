@@ -2,6 +2,8 @@ import { CommandId, MessageId, type OrchestrationV2Command } from "@t3tools/cont
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -66,7 +68,7 @@ export function limitRecoveryCommand(
     text: "Continue where you left off.",
     attachments: [],
     dispatchMode: { type: "start_immediately" },
-    createdBy: "user",
+    createdBy: "system",
     creationSource: "server",
   };
 }
@@ -75,6 +77,7 @@ const makeSweep = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const threads = yield* ThreadManagement.ThreadManagementService;
   const settings = yield* ServerSettings.ServerSettingsService;
+  const initiatives = yield* Effect.serviceOption(InitiativeService.InitiativeService);
   return Effect.fn("UsageLimitRecoveryWorker.sweep")(function* () {
     const preferences = yield* settings.getSettings;
     const now = yield* DateTime.now;
@@ -92,6 +95,14 @@ const makeSweep = Effect.gen(function* () {
         preferences.snoozeLimitedThreads,
       );
       if (command === null) continue;
+      // Keep the failed run's recovery choice intact while initiative work is
+      // inactive. Its original reset/request identity remains due after resume.
+      if (
+        command.type === "message.dispatch" &&
+        Option.isSome(initiatives) &&
+        !(yield* initiatives.value.isAutomaticWorkAllowed(thread.id))
+      )
+        continue;
       yield* threads.dispatch(command).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("orchestration-v2.limit-recovery.dispatch-failed", {

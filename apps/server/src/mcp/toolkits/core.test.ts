@@ -33,6 +33,7 @@ import { PreviewControlsToolkit } from "./previewControls/tools.ts";
 import { EnvironmentToolkit } from "./environment/tools.ts";
 import * as EnvironmentHandlers from "./environment/handlers.ts";
 import { ProjectToolkit } from "./project/tools.ts";
+import { InitiativeToolkit } from "./initiative/tools.ts";
 import { AttachmentToolkit } from "./attachment/tools.ts";
 import * as AttachmentHandlers from "./attachment/handlers.ts";
 import { ThreadToolkit } from "./thread/tools.ts";
@@ -65,6 +66,7 @@ it("publishes unique tool names with reference-free object-root inputs", () => {
     ThreadToolkit,
     AttachmentToolkit,
     ProjectToolkit,
+    InitiativeToolkit,
     EnvironmentToolkit,
     PreviewControlsToolkit,
     DeviceToolkit,
@@ -512,4 +514,52 @@ it.effect("a caller cannot interrupt a thread that runs above its own modes", ()
       ),
     ),
   ),
+);
+
+it.effect(
+  "scheduled-task run-now preserves the calling agent origin through production MCP registration",
+  () =>
+    Effect.gen(function* () {
+      const server = yield* McpServer.McpServer;
+      const result = yield* server
+        .callTool({ name: "run_scheduled_task_now", arguments: { taskId: "task-full-access" } })
+        .pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+          Effect.provideService(McpSchema.McpServerClient, client),
+        );
+      expect(result.isError).toBe(false);
+    }).pipe(
+      Effect.provide(
+        McpHttpServer.layerThreadToolkit.pipe(
+          Layer.provideMerge(McpServer.McpServer.layer),
+          Layer.provide(NodeCrypto.layer),
+          Layer.provide(
+            Layer.mock(ThreadManagement.ThreadManagementService)({
+              getThreadShell: () =>
+                Effect.succeed({
+                  id: threadId,
+                  projectId: "project-a",
+                  deletedAt: null,
+                  archivedAt: null,
+                  activeRunId: RunId.make("active-mcp-run"),
+                  providerInstanceId: scope.thread!.providerInstanceId,
+                  runtimeMode: "full-access",
+                  interactionMode: "default",
+                } as never),
+            }),
+          ),
+          Layer.provide(
+            Layer.mock(ScheduledTaskService.ScheduledTaskService)({
+              list: () =>
+                Effect.succeed({ tasks: [scheduledTask("task-full-access", "full-access")] }),
+              runNow: (_input, origin) =>
+                Effect.sync(() => {
+                  expect(origin).toEqual({ createdBy: "agent", creationSource: "mcp" });
+                  return { task: scheduledTask("task-full-access", "full-access") };
+                }),
+            }),
+          ),
+        ),
+      ),
+    ),
 );

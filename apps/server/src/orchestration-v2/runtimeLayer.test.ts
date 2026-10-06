@@ -264,6 +264,7 @@ const moveProject = (projectId: ProjectId, workspaceRoot: string, updatedAt: str
   );
 
 const layerTest = Layer.mergeAll(
+  RuntimeLayer.layerInitiativeService,
   RuntimeLayer.layer,
   RuntimeLayer.layerEventSink,
   ProjectStore.layer,
@@ -437,6 +438,7 @@ it.layer(layerProjectDeletionTest)("project deletion during thread commands", (i
 });
 
 const layerSharedApplicationDataPlaneTest = Layer.mergeAll(
+  RuntimeLayer.layerInitiativeService,
   RuntimeLayer.layer.pipe(Layer.provide(RuntimeLayer.layerProjectService)),
   RuntimeLayer.layerProjectService,
   RuntimeLayer.layerEventSink,

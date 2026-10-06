@@ -624,6 +624,9 @@ function summaryActionPriority(action: ToolGroupAction | T3McpToolSummaryAction)
     case "queue-steer":
     case "question-respond":
     case "worktree-handoff":
+    case "initiative-create":
+    case "initiative-update":
+    case "initiative-status":
     case "project-create":
     case "project-update":
     case "project-delete":

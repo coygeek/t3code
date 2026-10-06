@@ -158,6 +158,7 @@ function SettingsIndexSections() {
       </SettingsSection>
 
       <SettingsSection title="Projects & threads">
+        <SettingsRow icon="list.number" label="Initiatives" target="SettingsInitiatives" />
         {selectedProjectKey !== null ? (
           <SettingsRow
             icon="folder"

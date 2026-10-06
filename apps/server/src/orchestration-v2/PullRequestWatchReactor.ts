@@ -31,6 +31,7 @@ import {
   PullRequestProviderError,
 } from "../pullRequest/PullRequestProvider.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
+import * as InitiativeService from "../project/InitiativeService.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -235,6 +236,7 @@ export const make = Effect.gen(function* () {
   const engine = yield* Orchestrator.OrchestratorV2;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const pullRequests = yield* PullRequestService.PullRequestService;
+  const initiatives = yield* InitiativeService.InitiativeService;
   const crypto = yield* Crypto.Crypto;
   const bootedAt = yield* Clock.currentTimeMillis;
   const lives = new Map<string, WatchLife>();
@@ -308,20 +310,23 @@ export const make = Effect.gen(function* () {
     next: ThreadPullRequestWatch | null,
     wake?: { readonly text: string; readonly notification: OrchestrationV2Notification },
   ) =>
-    Effect.gen(function* () {
-      const uuid = yield* crypto.randomUUIDv4;
-      yield* engine.dispatch({
-        type: "thread.pull-request-watch.sync",
-        commandId: CommandId.make(`server:pr-watch:${target.thread.id}:${uuid}`),
-        threadId: target.thread.id,
-        ...identityOf(target.link),
-        startedAt: target.watch.startedAt,
-        watch: next,
-        ...(wake === undefined
-          ? {}
-          : { wake: { ...wake, messageId: MessageId.make(`message:pr-watch:${uuid}`) } }),
-      });
-    });
+    initiatives.withAutomaticWorkAllowed(
+      target.thread.id,
+      Effect.gen(function* () {
+        const uuid = yield* crypto.randomUUIDv4;
+        yield* engine.dispatch({
+          type: "thread.pull-request-watch.sync",
+          commandId: CommandId.make(`server:pr-watch:${target.thread.id}:${uuid}`),
+          threadId: target.thread.id,
+          ...identityOf(target.link),
+          startedAt: target.watch.startedAt,
+          watch: next,
+          ...(wake === undefined
+            ? {}
+            : { wake: { ...wake, messageId: MessageId.make(`message:pr-watch:${uuid}`) } }),
+        });
+      }),
+    );
 
   // A watch that cannot read its pull request ends with a wake saying so, rather than showing
   // "Watching" while it learns nothing.
@@ -587,6 +592,7 @@ export const make = Effect.gen(function* () {
     const byPullRequest = new Map<string, Array<WatchTarget>>();
     const ending: Array<readonly [WatchTarget, WatchEndReason]> = [];
     for (const target of targets) {
+      if (!(yield* initiatives.isAutomaticWorkAllowed(target.thread.id))) continue;
       const reason = endsWithoutRead(target);
       if (reason !== undefined) {
         ending.push([target, reason]);
